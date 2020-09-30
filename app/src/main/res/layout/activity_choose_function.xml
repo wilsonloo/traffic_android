@@ -1,0 +1,89 @@
+<?xml version="1.0" encoding="utf-8"?>
+<RelativeLayout xmlns:android="http://schemas.android.com/apk/res/android"
+    xmlns:tools="http://schemas.android.com/tools"
+    android:layout_width="match_parent"
+    android:layout_height="match_parent"
+    tools:context="com.arcsoft.trafficLabel.activity.ChooseFunctionActivity">
+
+    <LinearLayout
+        android:layout_width="match_parent"
+        android:layout_height="match_parent"
+        android:orientation="vertical">
+
+    <LinearLayout
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:orientation="vertical">
+        <RadioGroup
+            android:id="@+id/radio_group_ft_orient"
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content">
+            <RadioButton
+                android:text="@string/ft_op_0"
+                android:id="@+id/rb_orient_0"
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content" />
+            <RadioButton
+                android:text="@string/ft_op_90"
+                android:id="@+id/rb_orient_90"
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content" />
+            <RadioButton
+                android:text="@string/ft_op_180"
+                android:id="@+id/rb_orient_180"
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content" />
+            <RadioButton
+                android:text="@string/ft_op_270"
+                android:id="@+id/rb_orient_270"
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content" />
+            <RadioButton
+                android:text="@string/ft_op_all"
+                android:id="@+id/rb_orient_all"
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content" />
+        </RadioGroup>
+
+        <RadioGroup
+            android:id="@+id/radio_group_choose_camera"
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:orientation="horizontal">
+
+            <RadioButton
+                android:id="@+id/rb_back_camera"
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
+                android:checked="true"
+                android:text="@string/rbtn_back_camera" />
+
+            <RadioButton
+                android:id="@+id/rb_front_camera"
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
+                android:text="@string/rbtn_front_camera" />
+        </RadioGroup>
+
+        <Spinner
+            android:id="@+id/spinner_tensorflows"
+            android:layout_width="match_parent"
+            android:layout_height="43dp"
+            android:entries="@array/tflite_list">
+        </Spinner>
+    </LinearLayout>
+
+    <LinearLayout
+        android:layout_width="match_parent"
+        android:layout_height="match_parent"
+        android:orientation="vertical"
+        android:gravity="center_horizontal">
+        <Button
+            android:layout_width="260dp"
+            android:layout_height="wrap_content"
+            android:layout_marginTop="80dp"
+            android:onClick="jumpToDetectFaceEmotionActivity"
+            android:text="@string/page_face_emotion" />
+    </LinearLayout>
+    </LinearLayout>
+</RelativeLayout>

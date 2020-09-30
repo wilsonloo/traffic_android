@@ -1,0 +1,5 @@
+anger
+disgust
+fear
+happy
+sad

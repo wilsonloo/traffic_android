@@ -1,0 +1,7 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <string-array name="tflite_list">
+        <item>本地 tflite</item>
+        <item>远程服务flask</item>
+    </string-array>
+</resources>
