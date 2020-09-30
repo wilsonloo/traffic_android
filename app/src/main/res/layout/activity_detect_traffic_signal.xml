@@ -19,7 +19,7 @@
             android:layout_width="match_parent"
             android:layout_height="match_parent"/>
 
-        <com.arcsoft.trafficLabel.widget.FaceRectView
+        <com.wilson_loo.traffic_label.widget.FaceRectView
             android:id="@+id/fe_traffic_label_rect_view"
             android:layout_width="match_parent"
             android:layout_height="match_parent" />

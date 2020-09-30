@@ -66,5 +66,4 @@ dependencies {
 
     // Use local TensorFlow library
     // implementation 'org.tensorflow:tensorflow-lite-local:0.0.0'
-
 }
