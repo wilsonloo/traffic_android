@@ -19,10 +19,12 @@ import android.util.Log;
 import android.view.View;
 import android.view.ViewTreeObserver;
 import android.view.WindowManager;
+import android.widget.TextView;
 
-import com.arcsoft.arcfacedemo.R;
 import com.arcsoft.trafficLabel.common.Constants;
 import com.arcsoft.trafficLabel.model.DrawInfo;
+import com.wilson_loo.traffic_label.R;
+import com.wilson_loo.traffic_label.tflite.ClassifierYoloV3;
 import com.wilson_loo.traffic_label.util.DrawHelper;
 import com.wilson_loo.traffic_label.util.camera.CameraHelper;
 import com.wilson_loo.traffic_label.util.camera.CameraHelper;
@@ -36,6 +38,8 @@ import java.io.InvalidClassException;
 import java.util.ArrayList;
 import java.util.HashMap;
 import java.util.Map;
+import java.util.concurrent.ExecutorService;
+import java.util.concurrent.Executors;
 
 
 public class DetectTrafficLabelActivity extends BaseActivity implements ViewTreeObserver.OnGlobalLayoutListener {
@@ -52,6 +56,10 @@ public class DetectTrafficLabelActivity extends BaseActivity implements ViewTree
     private Integer rgbCameraId = Camera.CameraInfo.CAMERA_FACING_BACK;
     private Integer mTensorflowType = Constants.TENSORFLOW_TYPE_TFLITE;
 
+    public static final int DETECT_STATE_FREE = 0;
+    public static final int DETECT_STATE_DETECTING = 1;
+    public static final int DETECT_STATE_DRAWING = 2;
+
     /**
      * 相机预览显示的控件，可为SurfaceView或TextureView
      */
@@ -67,13 +75,21 @@ public class DetectTrafficLabelActivity extends BaseActivity implements ViewTree
 
     private final Map<Integer, Bundle> mFaceLastEmotions = new HashMap<>();
 
+    private int mDetectState = DETECT_STATE_FREE;
+    public int getDetectState(){ return mDetectState;}
+    public void setDetectState(int state){ mDetectState = state;}
+    private final ExecutorService mSingleThreadExecutorForDetect = Executors.newSingleThreadExecutor();
+
+    private TextView mTextViewDetectResult = null;
+
+    private ArrayList<Classifier.Recognition> mLastRecognitions = null;
+
     private Classifier mClassifier;
     public Classifier getClassifier(){ return mClassifier;}
 
     // 私有函数列表 ***********************************************************
     private void initCamera() {
-        DisplayMetrics metrics = new DisplayMetrics();
-        getWindowManager().getDefaultDisplay().getMetrics(metrics);
+        DisplayMetrics metrics = new DisplayMetrics(); getWindowManager().getDefaultDisplay().getMetrics(metrics);
 
         CameraListener cameraListener = new CameraListener() {
             @Override
@@ -93,44 +109,74 @@ public class DetectTrafficLabelActivity extends BaseActivity implements ViewTree
 
             @Override
             public void onPreview(byte[] nv21, Camera camera) {
-                // 清空当前的所有框框
-                if (mTrafficLabelRectView != null) {
-                    mTrafficLabelRectView.clearFaceInfo();
-                }
+                if(mDetectState == DETECT_STATE_DRAWING) {
+                    // 有结果了，需要进行绘制
+                    if (mLastRecognitions != null) {
+                        // 清空当前的所有框框
+                        if (mTrafficLabelRectView != null) {
+                            mTrafficLabelRectView.clearFaceInfo();
+                        }
 
-                // 摄像机画面对应的位图
-                Bitmap previewBitmap = null;
-                {
-//                   camera.setOneShotPreviewCallback(null);
-                    //处理data
-                    Camera.Size previewSize = camera.getParameters().getPreviewSize();//获取尺寸,格式转换的时候要用到
-                    BitmapFactory.Options newOpts = new BitmapFactory.Options();
-                    newOpts.inJustDecodeBounds = true;
-                    YuvImage yuvimage = new YuvImage(
-                            nv21,
-                            ImageFormat.NV21,
-                            previewSize.width,
-                            previewSize.height,
-                            null);
-                    ByteArrayOutputStream baos = new ByteArrayOutputStream();
-                    yuvimage.compressToJpeg(new Rect(0, 0, previewSize.width, previewSize.height), 100, baos);// 80--JPG图片的质量[0-100],100最高
-                    byte[] rawImage = baos.toByteArray();
-                    //将rawImage转换成bitmap
-                    BitmapFactory.Options options = new BitmapFactory.Options();
-                    options.inPreferredConfig = Bitmap.Config.RGB_565;
-                    previewBitmap = BitmapFactory.decodeByteArray(rawImage, 0, rawImage.length, options);
-                }
-
-                if (mTrafficLabelRectView != null && drawHelper != null) {
-                    Bitmap faceBitmap = previewBitmap;
-                    Bundle bundle = null;
-
-                    // 进行预测和绘制
-                    Object[] predictResult = predict(0, faceBitmap);
-                    if(predictResult != null) {
-                        ArrayList<Classifier.Recognition> recognitions = (ArrayList<Classifier.Recognition>) predictResult[0];
-                        drawHelper.draw(mTrafficLabelRectView, recognitions);
+                        drawHelper.draw(mTrafficLabelRectView, mLastRecognitions);
+                        mLastRecognitions = null;
                     }
+
+                    // 在下一帧开始检测
+                    mDetectState = DETECT_STATE_FREE;
+                    return;
+
+                }else if(mDetectState == DETECT_STATE_DETECTING){
+                    // 还在检测中
+                    return;
+
+                }else{
+                    // 可以开始检测了
+                    mDetectState = DETECT_STATE_DETECTING;
+
+                    // 摄像机画面对应的位图
+                    Bitmap previewBitmap = null;
+                    {
+                        // camera.setOneShotPreviewCallback(null);
+                        // 处理data
+                        Camera.Size previewSize = camera.getParameters().getPreviewSize();//获取尺寸,格式转换的时候要用到
+                        BitmapFactory.Options newOpts = new BitmapFactory.Options();
+                        newOpts.inJustDecodeBounds = true;
+                        YuvImage yuvimage = new YuvImage(
+                                nv21,
+                                ImageFormat.NV21,
+                                previewSize.width,
+                                previewSize.height,
+                                null);
+                        ByteArrayOutputStream baos = new ByteArrayOutputStream();
+                        yuvimage.compressToJpeg(new Rect(0, 0, previewSize.width, previewSize.height), 100, baos);// 80--JPG图片的质量[0-100],100最高
+                        byte[] rawImage = baos.toByteArray();
+                        //将rawImage转换成bitmap
+                        BitmapFactory.Options options = new BitmapFactory.Options();
+                        options.inPreferredConfig = Bitmap.Config.RGB_565;
+                        previewBitmap = BitmapFactory.decodeByteArray(rawImage, 0, rawImage.length, options);
+                    }
+
+                    Bitmap finalPreviewBitmap = previewBitmap;
+                    mSingleThreadExecutorForDetect.execute(new Runnable() {
+                        @Override
+                        public void run() {
+                            if (mTrafficLabelRectView != null && drawHelper != null) {
+                                Bitmap faceBitmap = finalPreviewBitmap;
+                                Bundle bundle = null;
+
+                                // 进行预测和绘制
+                                Object[] predictResult = predict(0, faceBitmap);
+                                if (predictResult != null) {
+                                    mLastRecognitions = (ArrayList<Classifier.Recognition>) predictResult[0];
+//                                    drawHelper.draw(mTrafficLabelRectView, recognitions);
+                                    mDetectState = DETECT_STATE_DRAWING;
+                                }else{
+                                    mDetectState = DETECT_STATE_FREE;
+                                    mLastRecognitions = null;
+                                }
+                            }
+                        }
+                    });
                 }
             }
 
@@ -141,6 +187,12 @@ public class DetectTrafficLabelActivity extends BaseActivity implements ViewTree
 
                 ArrayList<Classifier.Recognition> recognitions = (ArrayList<Classifier.Recognition>) mClassifier.RecognizeImage(faceId, faceBitmap8888, 0);
                 if (recognitions != null && recognitions.size() > 0) {
+                    String result = "";
+                    for(int k = 0; k < recognitions.size(); ++k){
+                        result += recognitions.get(k).getName()+" : " + recognitions.get(k).getConfidence() + "\n";
+                    }
+                    Log.e("= Detect result", ">>>>>>>>>>>>>>>>>>>> " + result);
+
                     return new Object[]{recognitions};
                 }
 
@@ -178,7 +230,7 @@ public class DetectTrafficLabelActivity extends BaseActivity implements ViewTree
         cameraHelper.start();
     }
 
-    private void initClassifier(int numThreads){
+    private void initClassifier(float scoreThreshold, int numThreads){
         try {
             if(mTensorflowType == Constants.TENSORFLOW_TYPE_FLASK_REMOTE) {
                 mClassifier = Classifier.Create(this,
@@ -190,6 +242,7 @@ public class DetectTrafficLabelActivity extends BaseActivity implements ViewTree
                         Classifier.Model.YOLO_V3,
                         Classifier.Device.CPU,
                         numThreads);
+                ((ClassifierYoloV3)mClassifier).setScoreThreshold(scoreThreshold);
             }else{
                 throw new InvalidClassException("tensorflow usage type, flaskremote or tflite");
             }
@@ -209,6 +262,7 @@ public class DetectTrafficLabelActivity extends BaseActivity implements ViewTree
         Intent intent = getIntent();
         rgbCameraId = intent.getIntExtra("whichCamera", Camera.CameraInfo.CAMERA_FACING_BACK);
         mTensorflowType = intent.getIntExtra("tensorflowType", Constants.TENSORFLOW_TYPE_TFLITE);
+        float scoreThreshold = intent.getFloatExtra("scoreThreshold", 0.3f);
 
         setContentView(R.layout.activity_detect_traffic_signal);
         getWindow().addFlags(WindowManager.LayoutParams.FLAG_KEEP_SCREEN_ON);
@@ -223,9 +277,10 @@ public class DetectTrafficLabelActivity extends BaseActivity implements ViewTree
 
         previewView = findViewById(R.id.fe_texture_preview);
         mTrafficLabelRectView = findViewById(R.id.fe_traffic_label_rect_view);
+        mTextViewDetectResult = findViewById(R.id.textDetectResult);
 
         // 分类器
-        initClassifier(4);
+        initClassifier(scoreThreshold, 4);
 
         //在布局结束后才做初始化操作
         previewView.getViewTreeObserver().addOnGlobalLayoutListener(this);

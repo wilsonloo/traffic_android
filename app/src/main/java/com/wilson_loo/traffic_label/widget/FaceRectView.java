@@ -8,6 +8,7 @@ import android.util.AttributeSet;
 import android.view.View;
 
 import com.arcsoft.trafficLabel.model.DrawInfo;
+import com.wilson_loo.traffic_label.activity.DetectTrafficLabelActivity;
 import com.wilson_loo.traffic_label.tflite.Classifier;
 import com.wilson_loo.traffic_label.util.DrawHelper;
 
@@ -29,12 +30,15 @@ public class FaceRectView extends View {
     // 人脸卡通表情区域
     private boolean mIsEmotionRectView = false;
 
+    private Context mContext = null;
+
     public FaceRectView(Context context) {
         this(context, null);
     }
 
     public FaceRectView(Context context, @Nullable AttributeSet attrs) {
         super(context, attrs);
+        mContext = context;
         paint = new Paint();
     }
 

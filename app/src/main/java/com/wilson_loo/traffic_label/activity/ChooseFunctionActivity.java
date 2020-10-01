@@ -10,11 +10,12 @@ import android.util.Log;
 import android.view.View;
 import android.widget.AdapterView;
 import android.widget.RadioGroup;
+import android.widget.SeekBar;
 import android.widget.Spinner;
 
-import com.arcsoft.arcfacedemo.R;
 import com.arcsoft.trafficLabel.common.Constants;
 import com.tencent.bugly.crashreport.CrashReport;
+import com.wilson_loo.traffic_label.R;
 
 import java.io.File;
 import java.util.ArrayList;
@@ -54,6 +55,7 @@ public class ChooseFunctionActivity extends BaseActivity {
     // 摄像头索引
     private int mCameraIndex = Camera.CameraInfo.CAMERA_FACING_BACK;
     private int mTensorflowType = Constants.TENSORFLOW_TYPE_TFLITE;
+    private SeekBar mSeekBar = null;
 
     private RadioGroup.OnCheckedChangeListener mRadioGroupChooseCameraListener = new RadioGroup.OnCheckedChangeListener(){
         @Override
@@ -109,6 +111,27 @@ public class ChooseFunctionActivity extends BaseActivity {
         Spinner spinnerTflite = findViewById(R.id.spinner_tensorflows);
         spinnerTflite.setOnItemSelectedListener(mSpinnerTFliteListener);
 
+        // 积分阈值
+        mSeekBar= findViewById(R.id.scoreThresoldSeekBar);
+        mSeekBar.setMax(100);
+        mSeekBar.setProgress(80);
+        mSeekBar.setOnSeekBarChangeListener(new SeekBar.OnSeekBarChangeListener() {
+            @Override
+            public void onProgressChanged(SeekBar seekBar, int i, boolean b) {
+
+            }
+
+            @Override
+            public void onStartTrackingTouch(SeekBar seekBar) {
+
+            }
+
+            @Override
+            public void onStopTrackingTouch(SeekBar seekBar) {
+
+            }
+        });
+
         CrashReport.initCrashReport(getApplicationContext(), "65b12e9090", true);
 
 //        testStaticEmotionClassify();
@@ -150,6 +173,7 @@ public class ChooseFunctionActivity extends BaseActivity {
         Bundle bundle = new Bundle();
         bundle.putInt("whichCamera", mCameraIndex);
         bundle.putInt("tensorflowType", mTensorflowType);
+        bundle.putFloat("scoreThreshold", mSeekBar.getProgress() * 1.0f / 100);
         checkLibraryAndJump(DetectTrafficLabelActivity.class, bundle);
     }
 

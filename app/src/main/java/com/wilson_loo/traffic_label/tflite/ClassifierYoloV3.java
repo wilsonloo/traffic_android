@@ -36,7 +36,8 @@ public class ClassifierYoloV3 extends Classifier {
     private static final int NUM_DETECTIONS = 10;
 
     // 置信度阀值
-    private static final float SCORE_THRESHOLD = 0.8f;
+    private float mScoreThreshold = 0.8f;
+    public void setScoreThreshold(float threshold){mScoreThreshold = threshold;}
 
     private static final int LARGE_SCALE = 76;
     private static final int MIDDLE_SCALE = 38;
@@ -92,11 +93,13 @@ public class ClassifierYoloV3 extends Classifier {
     public List<Recognition> RecognizeImage(int faceId, final Bitmap bitmap, int sensorOrientation) {
         // 将原始图片载入成tensorflow 的图片张量
         mInputTensorImage.load(bitmap);
-        int cropSize = Math.min(bitmap.getWidth(), bitmap.getHeight());
+        int originalWidth = bitmap.getWidth();
+        int originalHeight = bitmap.getHeight();
+        float ratio = Math.min(imageSizeX * 1.0f / originalWidth, imageSizeY * 1.0f / originalHeight);
         int numRotation = sensorOrientation / 90;
         // TODO(b/143564309): Fuse ops inside ImageProcessor.
         ImageProcessor imageProcessor = new ImageProcessor.Builder()
-                .add(new ResizeWithCropOrPadOp(cropSize, cropSize))
+                .add(new ResizeWithCropOrPadOp(imageSizeX, imageSizeX))
                 .add(new ResizeOp(imageSizeX, imageSizeY, ResizeOp.ResizeMethod.BILINEAR))
                 .add(new Rot90Op(numRotation))
                 .add(getPreprocessNormalizeOp())
@@ -128,27 +131,27 @@ public class ClassifierYoloV3 extends Classifier {
         mBoxId = 0;
         final ArrayList<Recognition> recognitions = new ArrayList<>(LARGE_SCALE);
         recognitions.clear();
-        postprocessBoxes(mPred_lbbox, LARGE_SCALE, recognitions);
-        postprocessBoxes(mPred_mbbox, MIDDLE_SCALE, recognitions);
-        postprocessBoxes(mPred_sbbox, SMALL_SCALE, recognitions);
+        postprocessBoxes(mPred_lbbox, LARGE_SCALE, ratio, recognitions);
+        postprocessBoxes(mPred_mbbox, MIDDLE_SCALE, ratio, recognitions);
+        postprocessBoxes(mPred_sbbox, SMALL_SCALE, ratio, recognitions);
 
         return recognitions;
     }
 
-    private void postprocessBoxes(final float[][][][][] bbox, int scale, ArrayList<Recognition> recognitions) {
+    private void postprocessBoxes(final float[][][][][] bbox, int scale, float ratio, ArrayList<Recognition> recognitions) {
         for (int i = 0; i < scale; ++i){
             for (int j = 0; j < scale; ++j) {
                 for (int k = 0; k < 3; ++k) {
                     // 只处理置信度满足的框框
                     float score = bbox[0][i][j][k][4];
-                    if(score >= SCORE_THRESHOLD) {
-                        float x = bbox[0][i][j][k][0];
-                        float y = bbox[0][i][j][k][1];
-                        float width = bbox[0][i][j][k][2];
-                        float height = bbox[0][i][j][k][3];
+                    if(score >= mScoreThreshold) {
+                        float x = bbox[0][i][j][k][0] / ratio;
+                        float y = bbox[0][i][j][k][1] / ratio;
+                        float width = bbox[0][i][j][k][2] / ratio;
+                        float height = bbox[0][i][j][k][3] / ratio;
 
                         int label = getTopOneLabel(bbox[0][i][j][k]);
-                        final RectF detection = new RectF(x, y, x + width, y + height);
+                        final RectF detection = new RectF(x-width/2, y-height/2, x + width/2, y + height/2);
                         recognitions.add(new Recognition("" + mBoxId, "label-" + label, score, detection));
                         ++mBoxId;
                     }

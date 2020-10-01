@@ -10,7 +10,6 @@ import android.graphics.BitmapFactory;
 import android.hardware.Camera;
 import android.os.Bundle;
 
-import com.arcsoft.arcfacedemo.R;
 import com.arcsoft.trafficLabel.model.DrawInfo;
 import com.wilson_loo.traffic_label.tflite.Classifier;
 import com.wilson_loo.traffic_label.widget.FaceRectView;
