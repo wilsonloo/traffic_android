@@ -8,14 +8,21 @@
     <ImageView
         android:id="@+id/static_traffic_pic"
         android:layout_width="match_parent"
-        android:layout_height="681dp"
+        android:layout_height="400dp"
         android:src="@mipmap/ic_launcher" />
 
     <Button
         android:layout_width="match_parent"
         android:layout_height="48dp"
         android:layout_gravity="bottom"
-        android:id="@+id/btnLoadImage"
-        android:text="@string/load_and_detect"/>
+        android:id="@+id/btnLoadImage_1"
+        android:text="speed limit 60"/>
+
+    <Button
+        android:layout_width="match_parent"
+        android:layout_height="48dp"
+        android:layout_gravity="bottom"
+        android:id="@+id/btnLoadImage_2"
+        android:text="speed limit 50_no_laba"/>
 
 </LinearLayout>

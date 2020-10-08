@@ -140,15 +140,15 @@ public class ClassifierYoloV3 extends Classifier {
         final HashMap<Integer, ArrayList<float[]>> classesInImage = new HashMap<>();
         classesInImage.clear();
 
-        concateBoxes(mPred_lbbox, LARGE_SCALE, ratio, boxes, classesInImage);
-        concateBoxes(mPred_mbbox, MIDDLE_SCALE, ratio, boxes, classesInImage);
-        concateBoxes(mPred_sbbox, SMALL_SCALE, ratio, boxes, classesInImage);
+        concateBoxes(mPred_lbbox, LARGE_SCALE, originalWidth, originalHeight, ratio, boxes, classesInImage);
+        concateBoxes(mPred_mbbox, MIDDLE_SCALE, originalWidth, originalHeight, ratio, boxes, classesInImage);
+        concateBoxes(mPred_sbbox, SMALL_SCALE, originalWidth, originalHeight, ratio, boxes, classesInImage);
 
         final ArrayList<Recognition> recognitions = nms(boxes, classesInImage);
         return recognitions;
     }
 
-    private void concateBoxes(final float[][][][][] bbox, int scale, float ratio, ArrayList<float[]> boxes, HashMap<Integer, ArrayList<float[]>> classesInImage) {
+    private void concateBoxes(final float[][][][][] bbox, int scale, int originalWidth, int originalHeight, float ratio, ArrayList<float[]> boxes, HashMap<Integer, ArrayList<float[]>> classesInImage) {
         for (int i = 0; i < scale; ++i){
             for (int j = 0; j < scale; ++j) {
                 for (int k = 0; k < 3; ++k) {
@@ -158,14 +158,26 @@ public class ClassifierYoloV3 extends Classifier {
                     if(score >= mScoreThreshold) {
                         for(int p = PROB_INDEX; p < box.length; ++p) {
                             if(score * box[p] >= 0.3f){ //mScoreThreshold) {
-                                float x = box[0] / ratio;
-                                float y = box[1] / ratio;
-                                float width = box[2] / ratio;
-                                float height = box[3] / ratio;
+                                float x = box[0];
+                                float y = box[1];
+                                float width = box[2];
+                                float height = box[3];
+
+                                float left = x - width * 0.5f;
+                                float top = y - height * 0.5f;
+                                float right = x + width * 0.5f;
+                                float bottom = y + height * 0.5f;
+
+                                float dw = (imageSizeX - ratio * originalWidth) / 2;
+                                float dh = (imageSizeY - ratio * originalHeight) / 2;
+                                left = (left - dw) / ratio;
+                                top = (top - dh) / ratio;
+                                right = (right - dw) / ratio;
+                                bottom = (bottom - dh) / ratio;
 
                                 // 该框框的置信度可行
                                 int label = p - PROB_INDEX;
-                                float[] b = {x-width/2, y-height/2, x+width/2, y+height/2, score, label};
+                                float[] b = {left, top, right, bottom, score, label};
                                 boxes.add(b);
 
                                 if(!classesInImage.containsKey(label)) {
@@ -242,7 +254,7 @@ public class ClassifierYoloV3 extends Classifier {
                     bboxes_iou(bestBox, labelBoxes, 0.45f);
 
                     final RectF detection = new RectF(bestBox[0], bestBox[1], bestBox[2], bestBox[3]);
-                    bestBoxes.add(new Recognition("" + mBoxId, "label-" + label, bestBox[4], detection));
+                    bestBoxes.add(new Recognition("" + mBoxId, mLabelsList.get(label), bestBox[4], detection));
                     ++mBoxId;
                 }
             }

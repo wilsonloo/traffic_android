@@ -21,6 +21,7 @@ import android.hardware.Camera;
 import android.net.Uri;
 import android.os.Build;
 import android.os.Bundle;
+import android.os.Trace;
 import android.support.v4.app.ActivityCompat;
 import android.support.v4.content.ContextCompat;
 import android.support.v7.app.AppCompatActivity;
@@ -158,11 +159,16 @@ public class DetectTrafficLabelStaticActivity extends AppCompatActivity implemen
         mTextViewDetectResult = findViewById(R.id.textDetectResult);
 
         mImageView = findViewById(R.id.static_traffic_pic);
-        mButton = findViewById(R.id.btnLoadImage);
-        mButton.setOnClickListener(  new View.OnClickListener(){
+        findViewById(R.id.btnLoadImage_1).setOnClickListener(  new View.OnClickListener(){
             @Override
             public void onClick(View view) {
-                showPicture();
+                showPicture("speed_limit_60.jpg");
+            }
+        });
+        findViewById(R.id.btnLoadImage_2).setOnClickListener(  new View.OnClickListener(){
+            @Override
+            public void onClick(View view) {
+                showPicture("speed_limit_50_no_laba.jpg");
             }
         });
 
@@ -185,27 +191,37 @@ public class DetectTrafficLabelStaticActivity extends AppCompatActivity implemen
 
     }
 
-    private void showPicture(){
+    private void showPicture(String imageName){
+        final int rectLineSize = 3;
+
         try {
-            InputStream is = this.getAssets().open("static_traffic.jpg");
+            Log.e("LWS", "load image...");
+            InputStream is = this.getAssets().open(imageName);
             mBitmap = BitmapFactory.decodeStream(is);
             Bitmap tempBitmap = mBitmap.copy(Bitmap.Config.ARGB_8888, true);
             Canvas canvas = new Canvas(tempBitmap);
+            Log.e("LWS", "load image...done");
 
             // 进行预测
+            Log.e("LWS", "predict...");
             ArrayList<Classifier.Recognition> recognitions = predict(0, mBitmap);
+            Log.e("LWS", "predict...done");
 
             // 绘制识别结果
+            Log.e("LWS", "draw result...");
             for(Iterator iter = recognitions.iterator(); iter.hasNext();){
                 Classifier.Recognition box = (Classifier.Recognition) iter.next();
                 Paint paint = new Paint();
                 paint.setColor(Color.RED);
+                paint.setTextSize(24);
+                canvas.drawText(box.getTitle(), box.getRect().left, box.getRect().top - rectLineSize, paint);
+
                 paint.setStyle(Paint.Style.STROKE);
-                paint.setStrokeWidth(10);
+                paint.setStrokeWidth(rectLineSize);
                 canvas.drawRect(box.getRect().left, box.getRect().top, box.getRect().right, box.getRect().bottom, paint);
             }
-
             mImageView.setImageBitmap(tempBitmap);
+            Log.e("LWS", "draw result...done");
 
         }catch (IOException e){
             e.printStackTrace();;
@@ -223,7 +239,7 @@ public class DetectTrafficLabelStaticActivity extends AppCompatActivity implemen
             for(int k = 0; k < recognitions.size(); ++k){
                 result += recognitions.get(k).getName()+" : " + recognitions.get(k).getConfidence() + "\n";
             }
-            Log.e("= Detect result", ">>>>>>>>>>>>>>>>>>>> " + result);
+            Log.e("= Detect result(2)", ">>>>>>>>>>>>>>>>>>>> \n" + result);
 
             return recognitions;
         }

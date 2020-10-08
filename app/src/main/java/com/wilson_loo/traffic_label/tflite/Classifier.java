@@ -25,7 +25,6 @@ import org.tensorflow.lite.support.tensorbuffer.TensorBuffer;
 
 import java.io.IOException;
 import java.nio.MappedByteBuffer;
-import java.security.InvalidParameterException;
 import java.util.ArrayList;
 import java.util.Comparator;
 import java.util.List;
@@ -87,7 +86,7 @@ public abstract class Classifier {
     /**
      * Labels corresponding to the output of the vision model.
      */
-    protected List<String> labels;
+    protected List<String> mLabelsList;
 
     /**
      * Input image TensorBuffer.
@@ -166,7 +165,7 @@ public abstract class Classifier {
 
         // 标签文件
         String labelPath = getLabelPath();
-        labels = FileUtil.loadLabels(activity, labelPath);
+        mLabelsList = FileUtil.loadLabels(activity, labelPath);
 
         // 输入的图片尺寸信息
         {
@@ -219,7 +218,7 @@ public abstract class Classifier {
 
         // 转换为 各个标签对应的概率
         Map<String/*标签*/, Float /*预测成该标签的概率*/> labeledProbability =
-                new TensorLabel(labels, mProbabilityProcessor.process(mOutputProbabilityBuffer))
+                new TensorLabel(mLabelsList, mProbabilityProcessor.process(mOutputProbabilityBuffer))
                         .getMapWithFloatValue();
 
         // 获取前几项结果
