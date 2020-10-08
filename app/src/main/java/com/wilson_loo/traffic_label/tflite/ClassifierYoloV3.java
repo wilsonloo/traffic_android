@@ -15,6 +15,8 @@ import org.tensorflow.lite.support.image.ops.Rot90Op;
 import java.io.IOException;
 import java.util.ArrayList;
 import java.util.HashMap;
+import java.util.HashSet;
+import java.util.Iterator;
 import java.util.List;
 import java.util.Map;
 
@@ -42,6 +44,9 @@ public class ClassifierYoloV3 extends Classifier {
     private static final int LARGE_SCALE = 76;
     private static final int MIDDLE_SCALE = 38;
     private static final int SMALL_SCALE = 19;
+
+    private static final int SCORE_INDEX = 4;
+    private static final int PROB_INDEX = 5;
 
     private int mBoxId = 0;
 
@@ -129,51 +134,120 @@ public class ClassifierYoloV3 extends Classifier {
         tflite.runForMultipleInputsOutputs(inputArray, outputMap);
 
         mBoxId = 0;
-        final ArrayList<Recognition> recognitions = new ArrayList<>(LARGE_SCALE);
-        recognitions.clear();
-        postprocessBoxes(mPred_lbbox, LARGE_SCALE, ratio, recognitions);
-        postprocessBoxes(mPred_mbbox, MIDDLE_SCALE, ratio, recognitions);
-        postprocessBoxes(mPred_sbbox, SMALL_SCALE, ratio, recognitions);
+        final ArrayList<float[]> boxes = new ArrayList<>();
+        boxes.clear();
 
+        final HashMap<Integer, ArrayList<float[]>> classesInImage = new HashMap<>();
+        classesInImage.clear();
+
+        concateBoxes(mPred_lbbox, LARGE_SCALE, ratio, boxes, classesInImage);
+        concateBoxes(mPred_mbbox, MIDDLE_SCALE, ratio, boxes, classesInImage);
+        concateBoxes(mPred_sbbox, SMALL_SCALE, ratio, boxes, classesInImage);
+
+        final ArrayList<Recognition> recognitions = nms(boxes, classesInImage);
         return recognitions;
     }
 
-    private void postprocessBoxes(final float[][][][][] bbox, int scale, float ratio, ArrayList<Recognition> recognitions) {
+    private void concateBoxes(final float[][][][][] bbox, int scale, float ratio, ArrayList<float[]> boxes, HashMap<Integer, ArrayList<float[]>> classesInImage) {
         for (int i = 0; i < scale; ++i){
             for (int j = 0; j < scale; ++j) {
                 for (int k = 0; k < 3; ++k) {
                     // 只处理置信度满足的框框
-                    float score = bbox[0][i][j][k][4];
+                    float[] box = bbox[0][i][j][k];
+                    float score = box[SCORE_INDEX];
                     if(score >= mScoreThreshold) {
-                        float x = bbox[0][i][j][k][0] / ratio;
-                        float y = bbox[0][i][j][k][1] / ratio;
-                        float width = bbox[0][i][j][k][2] / ratio;
-                        float height = bbox[0][i][j][k][3] / ratio;
+                        for(int p = PROB_INDEX; p < box.length; ++p) {
+                            if(score * box[p] >= 0.3f){ //mScoreThreshold) {
+                                float x = box[0] / ratio;
+                                float y = box[1] / ratio;
+                                float width = box[2] / ratio;
+                                float height = box[3] / ratio;
 
-                        int label = getTopOneLabel(bbox[0][i][j][k]);
-                        final RectF detection = new RectF(x-width/2, y-height/2, x + width/2, y + height/2);
-                        recognitions.add(new Recognition("" + mBoxId, "label-" + label, score, detection));
-                        ++mBoxId;
+                                // 该框框的置信度可行
+                                int label = p - PROB_INDEX;
+                                float[] b = {x-width/2, y-height/2, x+width/2, y+height/2, score, label};
+                                boxes.add(b);
+
+                                if(!classesInImage.containsKey(label)) {
+                                    classesInImage.put(label, new ArrayList<>());
+                                }
+
+                                classesInImage.get(label).add(b);
+                            }
+                        }
                     }
                 }
             }
         }
     }
 
-    private int getTopOneLabel(final float[] probilities){
-        int index = -1;
-        float maxProbility = -1;
-        for (int k = 5; k < probilities.length; ++k){
-            if(probilities[k] > maxProbility){
-                maxProbility = probilities[k];
-                index = k;
+    private static int floatArgMax(ArrayList<float[]> list, int whichSlot){
+        float maxValue = -1.0f;
+        int maxIndex = -1;
+        for(int k = 0; k < list.size(); ++k){
+            if (list.get(k)[whichSlot] > maxValue){
+                maxValue = list.get(k)[whichSlot];
+                maxIndex = k;
             }
         }
 
-        if (index == -1){
-            return -1;
+        return maxIndex;
+    }
+
+    /*
+     * @param bboxes: (xmin, ymin, xmax, ymax, score, class/label)
+     * */
+    private static void bboxes_iou(float[] bestBox, ArrayList<float[]> otherBoxes, float iouThreshold){
+        if (otherBoxes.isEmpty()){
+            return;
         }
 
-        return index - 5;
+        float bestArea = (bestBox[2] - bestBox[0]) * (bestBox[3] - bestBox[1]);
+        for(int k = otherBoxes.size() - 1; k >= 0; --k){
+            float[] otherBox = otherBoxes.get(k);
+            float otherArea = (otherBox[2] - otherBox[0]) * (otherBox[3] - otherBox[1]);
+
+            float[] leftUP = {Math.max(bestBox[0], otherBox[0]), Math.max(bestBox[1], otherBox[1])};
+            float[] rightDown = {Math.min(bestBox[2], otherBox[2]), Math.min(bestBox[3], otherBox[3])};
+
+            float[] interSection = {Math.max(rightDown[0] - leftUP[0], 0.0f), Math.max(rightDown[1] - leftUP[1], 0.0f)};
+            float interArea = interSection[0] * interSection[1];
+            float unionArea = bestArea + otherArea - interArea;
+            float iou = unionArea <= 0 ? 0.0f : interArea / unionArea;
+            if(iou >= iouThreshold){
+                // 这个格子和 bestBox 有交集，标记为已处理
+                otherBoxes.remove(k);
+            }
+        }
+    }
+
+    /*
+    * @param bboxes: (xmin, ymin, xmax, ymax, score, class/label)
+    * */
+    private ArrayList<Recognition> nms(final ArrayList<float[]> bboxes, HashMap<Integer, ArrayList<float[]>> classesInImage){
+        final ArrayList<Recognition> bestBoxes = new ArrayList<>();
+        bestBoxes.clear();
+
+        Iterator iter = classesInImage.entrySet().iterator();
+        while (iter.hasNext()) {
+            Map.Entry entry = (Map.Entry) iter.next();
+            int label = (int) entry.getKey();
+            ArrayList<float[]> labelBoxes = (ArrayList<float[]>) entry.getValue();
+            while(!labelBoxes.isEmpty()) {
+                int maxIndex = floatArgMax(labelBoxes, 4);
+                if(maxIndex >= 0) {
+                    float[] bestBox = labelBoxes.get(maxIndex);
+                    labelBoxes.remove(maxIndex);
+
+                    bboxes_iou(bestBox, labelBoxes, 0.45f);
+
+                    final RectF detection = new RectF(bestBox[0], bestBox[1], bestBox[2], bestBox[3]);
+                    bestBoxes.add(new Recognition("" + mBoxId, "label-" + label, bestBox[4], detection));
+                    ++mBoxId;
+                }
+            }
+        }
+
+        return bestBoxes;
     }
 }

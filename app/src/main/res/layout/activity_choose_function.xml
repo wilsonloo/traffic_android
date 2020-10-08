@@ -62,7 +62,13 @@
         android:layout_width="match_parent"
         android:layout_height="match_parent"
         android:orientation="vertical"
-        android:gravity="center_horizontal">
+        android:gravity="center_vertical">
+        <Button
+            android:layout_width="260dp"
+            android:layout_height="wrap_content"
+            android:layout_marginRight="80dp"
+            android:onClick="jumpToDetectStaticImageActivity"
+            android:text="@string/static_image_recognize"/>
         <Button
             android:layout_width="260dp"
             android:layout_height="wrap_content"

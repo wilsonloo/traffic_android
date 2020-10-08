@@ -11,7 +11,9 @@
     <string name="page_multi_image">人脸比对1:n（图片vs图片）</string>
     <string name="page_face_manage">人脸批量注册管理</string>
     <string name="page_face_emotion">实时识别</string>
+    <string name="static_image_recognize">静态图片识别</string>>
     <string name="btn_text_screenshoot_traffic_signal">画面抓取</string>
+    <string name="load_and_detect">加载识别</string>
     <string name="active_engine">激活引擎</string>
     <string name="active_success">激活引擎成功</string>
     <string name="already_activated">引擎已激活，无需再次激活</string>

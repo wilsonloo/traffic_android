@@ -23,6 +23,8 @@
         <activity
             android:name="com.wilson_loo.traffic_label.activity.DetectTrafficLabelActivity"
             android:launchMode="singleTop" />
+        <activity android:name=".activity.DetectTrafficLabelStaticActivity"
+            android:launchMode="singleTop"/>
         <activity
             android:name="com.wilson_loo.traffic_label.activity.ChooseFunctionActivity"
             android:launchMode="singleTop">

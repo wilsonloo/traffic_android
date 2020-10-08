@@ -4,7 +4,7 @@ import android.app.Activity;
 import android.content.res.AssetManager;
 import android.graphics.Bitmap;
 
-import com.arcsoft.trafficLabel.util.BitmapUtils;
+import com.wilson_loo.traffic_label.util.BitmapUtils;
 import com.wilson_loo.traffic_label.tflite.Classifier;
 
 import org.tensorflow.lite.support.common.TensorOperator;

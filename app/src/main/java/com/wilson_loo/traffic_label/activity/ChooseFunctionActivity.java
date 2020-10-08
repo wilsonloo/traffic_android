@@ -177,6 +177,14 @@ public class ChooseFunctionActivity extends BaseActivity {
         checkLibraryAndJump(DetectTrafficLabelActivity.class, bundle);
     }
 
+    public void jumpToDetectStaticImageActivity(View view){
+        Bundle bundle = new Bundle();
+        bundle.putInt("whichCamera", mCameraIndex);
+        bundle.putInt("tensorflowType", mTensorflowType);
+        bundle.putFloat("scoreThreshold", mSeekBar.getProgress() * 1.0f / 100);
+        checkLibraryAndJump(DetectTrafficLabelStaticActivity.class, bundle);
+    }
+
     /**
      * 激活引擎
      *

@@ -1,4 +1,4 @@
-package com.arcsoft.trafficLabel.util;
+package com.wilson_loo.traffic_label.util;
 
 
 import android.content.Context;
@@ -39,41 +39,41 @@ public class BitmapUtils {
      * @param name file name
      * @param bm picture to save
      */
-    public static String SaveBitmap(String name, Bitmap bm, Context mContext) {
-        //指定我们想要存储文件的地址
-        String TargetPath = mContext.getFilesDir() + "/images/";
-
-        //判断指定文件夹的路径是否存在
-        if (!FileUtils.fileIsExist(TargetPath)) {
-            Log.d("Save Bitmap", "TargetPath isn't exist");
-            return null;
-        } else {
-            //如果指定文件夹创建成功，那么我们则需要进行图片存储操作
-            String filePath = TargetPath + name + ".jpg";
-            File saveFile = new File(filePath);
-
-            try {
-                FileOutputStream saveImgOut = new FileOutputStream(saveFile);
-
-                // compress - 压缩的意思
-                bm.compress(Bitmap.CompressFormat.JPEG, 80, saveImgOut);
-
-                //存储完成后需要清除相关的进程
-                saveImgOut.flush();
-                saveImgOut.close();
-
-                Log.d("Save Bitmap", "write to "+filePath);
-                return filePath;
-
-            } catch (IOException ex) {
-                CrashReport.postCatchedException(ex);
-                ex.printStackTrace();
-                Log.d("Save Bitmap", "with exception");
-            }
-        }
-
-        return null;
-    }
+//    public static String SaveBitmap(String name, Bitmap bm, Context mContext) {
+//        //指定我们想要存储文件的地址
+//        String TargetPath = mContext.getFilesDir() + "/images/";
+//
+//        //判断指定文件夹的路径是否存在
+//        if (!FileUtils.fileIsExist(TargetPath)) {
+//            Log.d("Save Bitmap", "TargetPath isn't exist");
+//            return null;
+//        } else {
+//            //如果指定文件夹创建成功，那么我们则需要进行图片存储操作
+//            String filePath = TargetPath + name + ".jpg";
+//            File saveFile = new File(filePath);
+//
+//            try {
+//                FileOutputStream saveImgOut = new FileOutputStream(saveFile);
+//
+//                // compress - 压缩的意思
+//                bm.compress(Bitmap.CompressFormat.JPEG, 80, saveImgOut);
+//
+//                //存储完成后需要清除相关的进程
+//                saveImgOut.flush();
+//                saveImgOut.close();
+//
+//                Log.d("Save Bitmap", "write to "+filePath);
+//                return filePath;
+//
+//            } catch (IOException ex) {
+//                CrashReport.postCatchedException(ex);
+//                ex.printStackTrace();
+//                Log.d("Save Bitmap", "with exception");
+//            }
+//        }
+//
+//        return null;
+//    }
 }
 
 

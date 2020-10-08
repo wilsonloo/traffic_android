@@ -11,7 +11,9 @@
     <string name="page_multi_image">face compare 1:n(image vs image)</string>
     <string name="page_face_manage">face manage</string>
     <string name="page_face_emotion">realtime recognize</string>
+    <string name="static_image_recognize">static image recognize</string>>
     <string name="btn_text_screenshoot_traffic_signal">screen shoot</string>
+    <string name="load_and_detect" translatable="false">laod and detect traffic label</string>
     <string name="active_engine">active engine</string>
     <string name="active_success">active success</string>
     <string name="already_activated">already activated</string>
