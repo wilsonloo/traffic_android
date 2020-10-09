@@ -114,7 +114,7 @@ public class ChooseFunctionActivity extends BaseActivity {
         // 积分阈值
         mSeekBar= findViewById(R.id.scoreThresoldSeekBar);
         mSeekBar.setMax(100);
-        mSeekBar.setProgress(80);
+        mSeekBar.setProgress(70);
         mSeekBar.setOnSeekBarChangeListener(new SeekBar.OnSeekBarChangeListener() {
             @Override
             public void onProgressChanged(SeekBar seekBar, int i, boolean b) {

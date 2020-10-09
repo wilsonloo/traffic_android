@@ -2,17 +2,23 @@ package com.wilson_loo.traffic_label.activity;
 
 
 import android.Manifest;
+import android.app.Activity;
+import android.content.Context;
 import android.content.Intent;
 import android.content.pm.ActivityInfo;
+import android.content.res.Resources;
 import android.graphics.Bitmap;
 import android.graphics.BitmapFactory;
 import android.graphics.ImageFormat;
+import android.graphics.Matrix;
 import android.graphics.Point;
 import android.graphics.Rect;
 import android.graphics.YuvImage;
 import android.hardware.Camera;
+import android.icu.text.UFormat;
 import android.os.Build;
 import android.os.Bundle;
+import android.os.Environment;
 import android.support.v4.app.ActivityCompat;
 import android.util.DisplayMetrics;
 import android.util.Log;
@@ -20,22 +26,29 @@ import android.view.View;
 import android.view.ViewTreeObserver;
 import android.view.WindowManager;
 import android.widget.TextView;
+import android.widget.Toast;
 
 import com.arcsoft.trafficLabel.common.Constants;
-import com.arcsoft.trafficLabel.model.DrawInfo;
 import com.wilson_loo.traffic_label.R;
 import com.wilson_loo.traffic_label.tflite.ClassifierYoloV3;
 import com.wilson_loo.traffic_label.util.DrawHelper;
-import com.wilson_loo.traffic_label.util.camera.CameraHelper;
 import com.wilson_loo.traffic_label.util.camera.CameraHelper;
 import com.wilson_loo.traffic_label.util.camera.CameraListener;
 import com.tencent.bugly.crashreport.CrashReport;
 import com.wilson_loo.traffic_label.tflite.Classifier;
 import com.wilson_loo.traffic_label.widget.FaceRectView;
 
+import java.io.BufferedOutputStream;
 import java.io.ByteArrayOutputStream;
+import java.io.File;
+import java.io.FileNotFoundException;
+import java.io.FileOutputStream;
+import java.io.IOException;
 import java.io.InvalidClassException;
+import java.io.OutputStream;
+import java.text.SimpleDateFormat;
 import java.util.ArrayList;
+import java.util.Date;
 import java.util.HashMap;
 import java.util.Map;
 import java.util.concurrent.ExecutorService;
@@ -49,7 +62,8 @@ public class DetectTrafficLabelActivity extends BaseActivity implements ViewTree
     private static final int ACTION_REQUEST_PERMISSIONS = 0x001;
     private static final String[] NEEDED_PERMISSIONS = new String[]{
             Manifest.permission.CAMERA,
-            Manifest.permission.READ_PHONE_STATE
+            Manifest.permission.READ_PHONE_STATE,
+            Manifest.permission.WRITE_EXTERNAL_STORAGE,
     };
 
     private static final String TAG = "DetectTrafficActivity";
@@ -63,7 +77,7 @@ public class DetectTrafficLabelActivity extends BaseActivity implements ViewTree
     /**
      * 相机预览显示的控件，可为SurfaceView或TextureView
      */
-    private View previewView;
+    private View mPreviewView;
     private FaceRectView mTrafficLabelRectView;
 
     private Camera.Size previewSize;
@@ -72,6 +86,7 @@ public class DetectTrafficLabelActivity extends BaseActivity implements ViewTree
     private DrawHelper drawHelper;
 
     private int afCode = -1;
+    private boolean mToScreenShot = false;
 
     private final Map<Integer, Bundle> mFaceLastEmotions = new HashMap<>();
 
@@ -91,6 +106,8 @@ public class DetectTrafficLabelActivity extends BaseActivity implements ViewTree
     private void initCamera() {
         DisplayMetrics metrics = new DisplayMetrics(); getWindowManager().getDefaultDisplay().getMetrics(metrics);
 
+        BaseActivity activity = this;
+
         CameraListener cameraListener = new CameraListener() {
             @Override
             public void onCameraOpened(Camera camera, int cameraId, int displayOrientation, boolean isMirror) {
@@ -98,8 +115,8 @@ public class DetectTrafficLabelActivity extends BaseActivity implements ViewTree
                 previewSize = camera.getParameters().getPreviewSize();
                 drawHelper = new DrawHelper(previewSize.width,
                         previewSize.height,
-                        previewView.getWidth(),
-                        previewView.getHeight(),
+                        mPreviewView.getWidth(),
+                        mPreviewView.getHeight(),
                         displayOrientation,
                         cameraId,
                         isMirror,
@@ -152,11 +169,35 @@ public class DetectTrafficLabelActivity extends BaseActivity implements ViewTree
                         byte[] rawImage = baos.toByteArray();
                         //将rawImage转换成bitmap
                         BitmapFactory.Options options = new BitmapFactory.Options();
-                        options.inPreferredConfig = Bitmap.Config.RGB_565;
+                        options.inPreferredConfig = Bitmap.Config.ARGB_8888;
                         previewBitmap = BitmapFactory.decodeByteArray(rawImage, 0, rawImage.length, options);
                     }
 
-                    Bitmap finalPreviewBitmap = previewBitmap;
+                    Matrix matrix = new Matrix();
+                    matrix.postRotate(90);
+                    Bitmap finalPreviewBitmap = Bitmap.createBitmap(previewBitmap, 0, 0, previewBitmap.getWidth(), previewBitmap.getHeight(), matrix, true);
+
+                    if(mToScreenShot){
+                        mToScreenShot = false;
+                        Date day=new Date();
+                        SimpleDateFormat df = new SimpleDateFormat("yyyy-MM-dd_HH_mm_ss");
+                        String fileName = "traffic_"+df.format(day)+".jpg";
+                        File file = new File(Environment.getExternalStoragePublicDirectory(Environment.DIRECTORY_PICTURES), fileName);
+                        try{
+                            if(!file.exists()){
+                                file.createNewFile();
+                            }
+
+                            boolean ret = save(finalPreviewBitmap, file, Bitmap.CompressFormat.JPEG, false);
+                            if(ret){
+                                Toast.makeText(getApplicationContext(), "saved to " + file.getAbsolutePath(), Toast.LENGTH_SHORT).show();
+                            }
+
+                        }catch (Exception e){
+                            e.printStackTrace();
+                        }
+                    }
+
                     mSingleThreadExecutorForDetect.execute(new Runnable() {
                         @Override
                         public void run() {
@@ -219,11 +260,11 @@ public class DetectTrafficLabelActivity extends BaseActivity implements ViewTree
         };
 
         cameraHelper = new CameraHelper.Builder()
-                .previewViewSize(new Point(previewView.getMeasuredWidth(), previewView.getMeasuredHeight()))
+                .previewViewSize(new Point(mPreviewView.getMeasuredWidth(), mPreviewView.getMeasuredHeight()))
                 .rotation(getWindowManager().getDefaultDisplay().getRotation())
                 .specificCameraId(rgbCameraId != null ? rgbCameraId : Camera.CameraInfo.CAMERA_FACING_FRONT)
                 .isMirror(false)
-                .previewOn(previewView)
+                .previewOn(mPreviewView)
                 .cameraListener(cameraListener)
                 .build();
         cameraHelper.init();
@@ -275,7 +316,7 @@ public class DetectTrafficLabelActivity extends BaseActivity implements ViewTree
         // Activity启动后就锁定为启动时的方向
         setRequestedOrientation(ActivityInfo.SCREEN_ORIENTATION_LOCKED);
 
-        previewView = findViewById(R.id.fe_texture_preview);
+        mPreviewView = findViewById(R.id.fe_texture_preview);
         mTrafficLabelRectView = findViewById(R.id.fe_traffic_label_rect_view);
         mTextViewDetectResult = findViewById(R.id.textDetectResult);
 
@@ -283,7 +324,7 @@ public class DetectTrafficLabelActivity extends BaseActivity implements ViewTree
         initClassifier(scoreThreshold, 4);
 
         //在布局结束后才做初始化操作
-        previewView.getViewTreeObserver().addOnGlobalLayoutListener(this);
+        mPreviewView.getViewTreeObserver().addOnGlobalLayoutListener(this);
     }
 
     @Override
@@ -292,15 +333,47 @@ public class DetectTrafficLabelActivity extends BaseActivity implements ViewTree
     }
 
     /**
-     * 在{@link #previewView}第一次布局完成后，去除该监听，并且进行引擎和相机的初始化
+     * 在{@link #mPreviewView}第一次布局完成后，去除该监听，并且进行引擎和相机的初始化
      */
     @Override
     public void onGlobalLayout() {
-        previewView.getViewTreeObserver().removeOnGlobalLayoutListener(this);
+        mPreviewView.getViewTreeObserver().removeOnGlobalLayoutListener(this);
         if (!checkPermissions(NEEDED_PERMISSIONS)) {
             ActivityCompat.requestPermissions(this, NEEDED_PERMISSIONS, ACTION_REQUEST_PERMISSIONS);
         } else {
             initCamera();
+            findViewById(R.id.btn_screenshoot_traffic_signal).setOnClickListener(
+                    new View.OnClickListener(){
+                        @Override
+                        public void onClick(View view) {
+                            mToScreenShot = true;
+                        }
+                    }
+            );
         }
+    }
+
+    public static boolean save(Bitmap src, File file, Bitmap.CompressFormat format, boolean recycle){
+        if(isEmptyBitmap(src)){
+            return false;
+        }
+
+        OutputStream os;
+        boolean ret = false;
+        try{
+            os = new BufferedOutputStream(new FileOutputStream(file));
+            ret = src.compress(format, 100, os);
+            if(recycle && !src.isRecycled()){
+                src.recycle();
+            }
+        } catch (IOException e) {
+            e.printStackTrace();
+        }
+
+        return ret;
+    }
+
+    public static boolean isEmptyBitmap(Bitmap src){
+        return src == null || src.getWidth() == 0 || src.getHeight() == 0;
     }
 }

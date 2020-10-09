@@ -3,6 +3,7 @@ package com.wilson_loo.traffic_label.tflite;
 import android.app.Activity;
 import android.graphics.Bitmap;
 import android.graphics.RectF;
+import android.util.Log;
 
 import org.tensorflow.lite.support.common.TensorOperator;
 import org.tensorflow.lite.support.common.ops.NormalizeOp;
@@ -15,7 +16,6 @@ import org.tensorflow.lite.support.image.ops.Rot90Op;
 import java.io.IOException;
 import java.util.ArrayList;
 import java.util.HashMap;
-import java.util.HashSet;
 import java.util.Iterator;
 import java.util.List;
 import java.util.Map;
@@ -38,12 +38,13 @@ public class ClassifierYoloV3 extends Classifier {
     private static final int NUM_DETECTIONS = 10;
 
     // 置信度阀值
-    private float mScoreThreshold = 0.8f;
+    private float mScoreThreshold = 0.67f;
     public void setScoreThreshold(float threshold){mScoreThreshold = threshold;}
 
-    private static final int LARGE_SCALE = 76;
-    private static final int MIDDLE_SCALE = 38;
-    private static final int SMALL_SCALE = 19;
+    private static int LARGE_SCALE = 0;
+    private static int MIDDLE_SCALE = 0;
+    private static int SMALL_SCALE = 0;
+    private static int IMAGE_CHANNELS = 3;
 
     private static final int SCORE_INDEX = 4;
     private static final int PROB_INDEX = 5;
@@ -71,11 +72,17 @@ public class ClassifierYoloV3 extends Classifier {
 
     protected ClassifierYoloV3(Activity activity, Device device, int numThreads) throws IOException {
         super(activity, device, numThreads);
+
+        LARGE_SCALE = imageSizeX / 8;
+        MIDDLE_SCALE = imageSizeX / 16;
+        SMALL_SCALE = imageSizeX / 32;
     }
 
     @Override
     public String getModelPath() {
-        return "yolov3_608_66_test_loss_2.5108.tflite";
+//        return "yolov3_608_66_test_loss_2.5108.tflite";
+//        return "yolov3_416_66_test_loss_2.4417.tflite";
+        return "yolov3_416_66_lite_3.4591.tflite";
     }
 
     @Override
@@ -96,6 +103,8 @@ public class ClassifierYoloV3 extends Classifier {
     }
 
     public List<Recognition> RecognizeImage(int faceId, final Bitmap bitmap, int sensorOrientation) {
+        Log.e("LWS", "start recoginze...");
+
         // 将原始图片载入成tensorflow 的图片张量
         mInputTensorImage.load(bitmap);
         int originalWidth = bitmap.getWidth();
@@ -117,9 +126,9 @@ public class ClassifierYoloV3 extends Classifier {
         // TensorLabel labelHelper = new TensorLabel(labels, mProbabilityProcessor.process(mOutputProbabilityBuffer));
         // Map<String/*标签*/, Float /*预测成该标签的概率*/> labeledProbability = labelHelper.getMapWithFloatValue();
 
-        mPred_lbbox = new float[1][LARGE_SCALE][LARGE_SCALE][3][5+66];
-        mPred_mbbox = new float[1][MIDDLE_SCALE][MIDDLE_SCALE][3][5+66];
-        mPred_sbbox = new float[1][SMALL_SCALE][SMALL_SCALE][3][5+66];
+        mPred_lbbox = new float[1][LARGE_SCALE][LARGE_SCALE][IMAGE_CHANNELS][5+66];
+        mPred_mbbox = new float[1][MIDDLE_SCALE][MIDDLE_SCALE][IMAGE_CHANNELS][5+66];
+        mPred_sbbox = new float[1][SMALL_SCALE][SMALL_SCALE][IMAGE_CHANNELS][5+66];
         outputClasses = new float[1][NUM_DETECTIONS];
         outputScores = new float[1][NUM_DETECTIONS];
         numDetections = new float[1];
@@ -132,7 +141,9 @@ public class ClassifierYoloV3 extends Classifier {
 //        outputMap.put(4, outputScores);
 //        outputMap.put(5, numDetections);
         tflite.runForMultipleInputsOutputs(inputArray, outputMap);
+        Log.e("LWS", "start recoginze...done");
 
+        Log.e("LWS", "post progress...");
         mBoxId = 0;
         final ArrayList<float[]> boxes = new ArrayList<>();
         boxes.clear();
@@ -145,13 +156,15 @@ public class ClassifierYoloV3 extends Classifier {
         concateBoxes(mPred_sbbox, SMALL_SCALE, originalWidth, originalHeight, ratio, boxes, classesInImage);
 
         final ArrayList<Recognition> recognitions = nms(boxes, classesInImage);
+        Log.e("LWS", "post progress...done");
+
         return recognitions;
     }
 
     private void concateBoxes(final float[][][][][] bbox, int scale, int originalWidth, int originalHeight, float ratio, ArrayList<float[]> boxes, HashMap<Integer, ArrayList<float[]>> classesInImage) {
         for (int i = 0; i < scale; ++i){
             for (int j = 0; j < scale; ++j) {
-                for (int k = 0; k < 3; ++k) {
+                for (int k = 0; k < IMAGE_CHANNELS; ++k) {
                     // 只处理置信度满足的框框
                     float[] box = bbox[0][i][j][k];
                     float score = box[SCORE_INDEX];

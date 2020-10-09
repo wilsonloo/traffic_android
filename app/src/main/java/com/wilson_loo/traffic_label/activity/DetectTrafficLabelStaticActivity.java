@@ -209,16 +209,18 @@ public class DetectTrafficLabelStaticActivity extends AppCompatActivity implemen
 
             // 绘制识别结果
             Log.e("LWS", "draw result...");
-            for(Iterator iter = recognitions.iterator(); iter.hasNext();){
-                Classifier.Recognition box = (Classifier.Recognition) iter.next();
-                Paint paint = new Paint();
-                paint.setColor(Color.RED);
-                paint.setTextSize(24);
-                canvas.drawText(box.getTitle(), box.getRect().left, box.getRect().top - rectLineSize, paint);
+            if(recognitions != null) {
+                for (Iterator iter = recognitions.iterator(); iter.hasNext(); ) {
+                    Classifier.Recognition box = (Classifier.Recognition) iter.next();
+                    Paint paint = new Paint();
+                    paint.setColor(Color.RED);
+                    paint.setTextSize(24);
+                    canvas.drawText(box.getTitle(), box.getRect().left, box.getRect().top - rectLineSize, paint);
 
-                paint.setStyle(Paint.Style.STROKE);
-                paint.setStrokeWidth(rectLineSize);
-                canvas.drawRect(box.getRect().left, box.getRect().top, box.getRect().right, box.getRect().bottom, paint);
+                    paint.setStyle(Paint.Style.STROKE);
+                    paint.setStrokeWidth(rectLineSize);
+                    canvas.drawRect(box.getRect().left, box.getRect().top, box.getRect().right, box.getRect().bottom, paint);
+                }
             }
             mImageView.setImageBitmap(tempBitmap);
             Log.e("LWS", "draw result...done");
