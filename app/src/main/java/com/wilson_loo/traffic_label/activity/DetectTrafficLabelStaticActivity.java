@@ -223,7 +223,7 @@ public class DetectTrafficLabelStaticActivity extends AppCompatActivity implemen
         });
 
         // 分类器
-        initClassifier(scoreThreshold, 4);
+        initClassifier(scoreThreshold, 16);
 
         //在布局结束后才做初始化操
         mPreviewView.getViewTreeObserver().addOnGlobalLayoutListener(this);
