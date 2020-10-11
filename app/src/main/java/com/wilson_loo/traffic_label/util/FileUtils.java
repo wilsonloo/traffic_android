@@ -1,4 +1,4 @@
-package com.arcsoft.trafficLabel.util;
+package com.wilson_loo.traffic_label.util;
 
 
 import java.io.File;

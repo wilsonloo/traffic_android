@@ -109,7 +109,6 @@ public class ClassifierYoloV3 extends Classifier {
         mInputTensorImage.load(bitmap);
         int originalWidth = bitmap.getWidth();
         int originalHeight = bitmap.getHeight();
-        float ratio = Math.min(imageSizeX * 1.0f / originalWidth, imageSizeY * 1.0f / originalHeight);
         int numRotation = sensorOrientation / 90;
         // TODO(b/143564309): Fuse ops inside ImageProcessor.
         ImageProcessor imageProcessor = new ImageProcessor.Builder()
@@ -151,9 +150,9 @@ public class ClassifierYoloV3 extends Classifier {
         final HashMap<Integer, ArrayList<float[]>> classesInImage = new HashMap<>();
         classesInImage.clear();
 
-        concateBoxes(mPred_lbbox, LARGE_SCALE, originalWidth, originalHeight, ratio, boxes, classesInImage);
-        concateBoxes(mPred_mbbox, MIDDLE_SCALE, originalWidth, originalHeight, ratio, boxes, classesInImage);
-        concateBoxes(mPred_sbbox, SMALL_SCALE, originalWidth, originalHeight, ratio, boxes, classesInImage);
+        concateBoxes(mPred_lbbox, LARGE_SCALE, originalWidth, originalHeight, boxes, classesInImage);
+        concateBoxes(mPred_mbbox, MIDDLE_SCALE, originalWidth, originalHeight, boxes, classesInImage);
+        concateBoxes(mPred_sbbox, SMALL_SCALE, originalWidth, originalHeight, boxes, classesInImage);
 
         final ArrayList<Recognition> recognitions = nms(boxes, classesInImage);
         Log.e("LWS", "post progress...done");
@@ -161,7 +160,7 @@ public class ClassifierYoloV3 extends Classifier {
         return recognitions;
     }
 
-    private void concateBoxes(final float[][][][][] bbox, int scale, int originalWidth, int originalHeight, float ratio, ArrayList<float[]> boxes, HashMap<Integer, ArrayList<float[]>> classesInImage) {
+    private void concateBoxes(final float[][][][][] bbox, int scale, int originalWidth, int originalHeight, ArrayList<float[]> boxes, HashMap<Integer, ArrayList<float[]>> classesInImage) {
         for (int i = 0; i < scale; ++i){
             for (int j = 0; j < scale; ++j) {
                 for (int k = 0; k < IMAGE_CHANNELS; ++k) {
@@ -181,12 +180,13 @@ public class ClassifierYoloV3 extends Classifier {
                                 float right = x + width * 0.5f;
                                 float bottom = y + height * 0.5f;
 
-                                float dw = (imageSizeX - ratio * originalWidth) / 2;
-                                float dh = (imageSizeY - ratio * originalHeight) / 2;
-                                left = (left - dw) / ratio;
-                                top = (top - dh) / ratio;
-                                right = (right - dw) / ratio;
-                                bottom = (bottom - dh) / ratio;
+                                float dw =(imageSizeX - originalWidth) / 2;
+                                float dh = (imageSizeY - originalHeight) / 2;
+
+                                left = left - dw;
+                                top = top - dh;
+                                right = right - dw;
+                                bottom = bottom - dh;
 
                                 // 该框框的置信度可行
                                 int label = p - PROB_INDEX;

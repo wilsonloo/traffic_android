@@ -31,6 +31,7 @@ import android.widget.Toast;
 import com.arcsoft.trafficLabel.common.Constants;
 import com.wilson_loo.traffic_label.R;
 import com.wilson_loo.traffic_label.tflite.ClassifierYoloV3;
+import com.wilson_loo.traffic_label.util.BitmapUtils;
 import com.wilson_loo.traffic_label.util.DrawHelper;
 import com.wilson_loo.traffic_label.util.camera.CameraHelper;
 import com.wilson_loo.traffic_label.util.camera.CameraListener;
@@ -150,12 +151,14 @@ public class DetectTrafficLabelActivity extends BaseActivity implements ViewTree
                     // 可以开始检测了
                     mDetectState = DETECT_STATE_DETECTING;
 
+                    Camera.Size previewSize = camera.getParameters().getPreviewSize();//获取尺寸,格式转换的时候要用到
+
                     // 摄像机画面对应的位图
                     Bitmap previewBitmap = null;
+                    if(false)
                     {
                         // camera.setOneShotPreviewCallback(null);
                         // 处理data
-                        Camera.Size previewSize = camera.getParameters().getPreviewSize();//获取尺寸,格式转换的时候要用到
                         BitmapFactory.Options newOpts = new BitmapFactory.Options();
                         newOpts.inJustDecodeBounds = true;
                         YuvImage yuvimage = new YuvImage(
@@ -172,30 +175,21 @@ public class DetectTrafficLabelActivity extends BaseActivity implements ViewTree
                         options.inPreferredConfig = Bitmap.Config.ARGB_8888;
                         previewBitmap = BitmapFactory.decodeByteArray(rawImage, 0, rawImage.length, options);
                     }
+                    if(true){
+                        int[] rgbBytes = new int[previewSize.width * previewSize.height];
+                        BitmapUtils.convertYUV420SPToARGB8888(nv21, previewSize.width, previewSize.height, rgbBytes);
+
+                        Bitmap rgbFrameBitmap = Bitmap.createBitmap(previewSize.width, previewSize.height, Bitmap.Config.ARGB_8888);
+                        rgbFrameBitmap.setPixels(rgbBytes, 0, previewSize.width, 0, 0, previewSize.width, previewSize.height);
+                        previewBitmap = rgbFrameBitmap;// BitmapUtils.adjustToSize(rgbFrameBitmap, 800, 800);
+                    }
 
                     Matrix matrix = new Matrix();
                     matrix.postRotate(90);
                     Bitmap finalPreviewBitmap = Bitmap.createBitmap(previewBitmap, 0, 0, previewBitmap.getWidth(), previewBitmap.getHeight(), matrix, true);
 
                     if(mToScreenShot){
-                        mToScreenShot = false;
-                        Date day=new Date();
-                        SimpleDateFormat df = new SimpleDateFormat("yyyy-MM-dd_HH_mm_ss");
-                        String fileName = "traffic_"+df.format(day)+".jpg";
-                        File file = new File(Environment.getExternalStoragePublicDirectory(Environment.DIRECTORY_PICTURES), fileName);
-                        try{
-                            if(!file.exists()){
-                                file.createNewFile();
-                            }
-
-                            boolean ret = save(finalPreviewBitmap, file, Bitmap.CompressFormat.JPEG, false);
-                            if(ret){
-                                Toast.makeText(getApplicationContext(), "saved to " + file.getAbsolutePath(), Toast.LENGTH_SHORT).show();
-                            }
-
-                        }catch (Exception e){
-                            e.printStackTrace();
-                        }
+                        saveScreenShot(finalPreviewBitmap);
                     }
 
                     mSingleThreadExecutorForDetect.execute(new Runnable() {
@@ -232,7 +226,7 @@ public class DetectTrafficLabelActivity extends BaseActivity implements ViewTree
                     for(int k = 0; k < recognitions.size(); ++k){
                         result += recognitions.get(k).getName()+" : " + recognitions.get(k).getConfidence() + "\n";
                     }
-                    Log.e("= Detect result", ">>>>>>>>>>>>>>>>>>>> " + result);
+                    Log.e("LWS", ">>>>>>>>>>>>>>>>>>>> " + result);
 
                     return new Object[]{recognitions};
                 }
@@ -269,6 +263,27 @@ public class DetectTrafficLabelActivity extends BaseActivity implements ViewTree
                 .build();
         cameraHelper.init();
         cameraHelper.start();
+    }
+
+    private void saveScreenShot(Bitmap finalPreviewBitmap) {
+        mToScreenShot = false;
+        Date day=new Date();
+        SimpleDateFormat df = new SimpleDateFormat("yyyy-MM-dd_HH_mm_ss");
+        String fileName = "traffic_"+df.format(day)+".jpg";
+        File file = new File(Environment.getExternalStoragePublicDirectory(Environment.DIRECTORY_PICTURES), fileName);
+        try{
+            if(!file.exists()){
+                file.createNewFile();
+            }
+
+            boolean ret = save(finalPreviewBitmap, file, Bitmap.CompressFormat.JPEG, false);
+            if(ret){
+                Toast.makeText(getApplicationContext(), "saved to " + file.getAbsolutePath(), Toast.LENGTH_SHORT).show();
+            }
+
+        }catch (Exception e){
+            e.printStackTrace();
+        }
     }
 
     private void initClassifier(float scoreThreshold, int numThreads){
@@ -321,7 +336,7 @@ public class DetectTrafficLabelActivity extends BaseActivity implements ViewTree
         mTextViewDetectResult = findViewById(R.id.textDetectResult);
 
         // 分类器
-        initClassifier(scoreThreshold, 4);
+        initClassifier(scoreThreshold, 8);
 
         //在布局结束后才做初始化操作
         mPreviewView.getViewTreeObserver().addOnGlobalLayoutListener(this);

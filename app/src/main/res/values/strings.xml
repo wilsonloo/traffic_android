@@ -1,6 +1,6 @@
 <resources>
     <!--app name-->
-    <string name="app_name">ArcFaceDemo</string>
+    <string name="app_name">Traffic</string>
 
     <!--settings、choose function page-->
     <string name="page_preview">face attributes detect(video)</string>
@@ -14,6 +14,7 @@
     <string name="static_image_recognize">static image recognize</string>>
     <string name="btn_text_screenshoot_traffic_signal">screen shoot</string>
     <string name="load_and_detect" translatable="false">laod and detect traffic label</string>
+    <string name="load_and_detect_video">load and detect video</string>
     <string name="active_engine">active engine</string>
     <string name="active_success">active success</string>
     <string name="already_activated">already activated</string>

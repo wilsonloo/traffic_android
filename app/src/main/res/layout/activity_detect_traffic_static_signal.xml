@@ -15,6 +15,13 @@
         android:layout_width="match_parent"
         android:layout_height="48dp"
         android:layout_gravity="bottom"
+        android:id="@+id/btnLoadVideo"
+        android:text="@string/load_and_detect_video"/>
+
+    <Button
+        android:layout_width="match_parent"
+        android:layout_height="48dp"
+        android:layout_gravity="bottom"
         android:id="@+id/btnLoadImage_1"
         android:text="speed limit 60"/>
 
@@ -24,5 +31,11 @@
         android:layout_gravity="bottom"
         android:id="@+id/btnLoadImage_2"
         android:text="speed limit 50_no_laba"/>
+
+    <Button
+        android:layout_width="match_parent"
+        android:layout_height="48dp"
+        android:text="@string/load_and_detect"
+        android:id="@+id/btn_load_and_detect"/>
 
 </LinearLayout>

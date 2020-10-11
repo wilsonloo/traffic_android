@@ -34,10 +34,16 @@
             android:layout_width="match_parent"
             android:layout_height="wrap_content"
             android:id="@+id/textDetectResult"/>
-        <Button
-            android:layout_width="wrap_content"
+        <LinearLayout
+            android:layout_width="match_parent"
             android:layout_height="wrap_content"
-            android:text="@string/btn_text_screenshoot_traffic_signal"
-            android:id="@+id/btn_screenshoot_traffic_signal"/>
+            android:gravity="center_horizontal">
+            <Button
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
+                android:text="@string/btn_text_screenshoot_traffic_signal"
+                android:id="@+id/btn_screenshoot_traffic_signal"/>
+
+        </LinearLayout>
     </LinearLayout>
 </LinearLayout>

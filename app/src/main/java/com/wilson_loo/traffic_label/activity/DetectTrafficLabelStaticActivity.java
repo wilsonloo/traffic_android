@@ -21,7 +21,10 @@ import android.hardware.Camera;
 import android.net.Uri;
 import android.os.Build;
 import android.os.Bundle;
+import android.os.Environment;
 import android.os.Trace;
+import android.provider.DocumentsContract;
+import android.provider.MediaStore;
 import android.support.v4.app.ActivityCompat;
 import android.support.v4.content.ContextCompat;
 import android.support.v7.app.AppCompatActivity;
@@ -33,6 +36,7 @@ import android.view.WindowManager;
 import android.widget.Button;
 import android.widget.ImageView;
 import android.widget.TextView;
+import android.widget.Toast;
 
 import com.arcsoft.trafficLabel.common.Constants;
 import com.tencent.bugly.crashreport.CrashReport;
@@ -40,12 +44,16 @@ import com.wilson_loo.traffic_label.R;
 import com.wilson_loo.traffic_label.tflite.Classifier;
 import com.wilson_loo.traffic_label.tflite.ClassifierYoloV3;
 import com.wilson_loo.traffic_label.util.DrawHelper;
+import com.wilson_loo.traffic_label.util.MediaDecoder;
+import com.wilson_loo.traffic_label.util.OnGetBitmapListener;
 import com.wilson_loo.traffic_label.util.camera.CameraHelper;
 import com.wilson_loo.traffic_label.util.camera.CameraListener;
 import com.wilson_loo.traffic_label.widget.FaceRectView;
 
 import java.io.ByteArrayOutputStream;
 import java.io.File;
+import java.io.FileInputStream;
+import java.io.FileNotFoundException;
 import java.io.IOException;
 import java.io.InputStream;
 import java.io.InvalidClassException;
@@ -55,8 +63,25 @@ import java.util.Iterator;
 import java.util.Map;
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
+import java.util.concurrent.Semaphore;
 
-public class DetectTrafficLabelStaticActivity extends AppCompatActivity implements ViewTreeObserver.OnGlobalLayoutListener {
+public class DetectTrafficLabelStaticActivity extends AppCompatActivity implements ViewTreeObserver.OnGlobalLayoutListener, Camera.PreviewCallback {
+
+
+    private class OnGetBitmapImpl implements OnGetBitmapListener {
+        private final DetectTrafficLabelStaticActivity mAct;
+
+        public OnGetBitmapImpl(DetectTrafficLabelStaticActivity act){
+            mAct = act;
+        }
+
+        @Override
+        public void getBitmap(Bitmap bitmap, long timeMs) {
+            mAct.mBitmap = bitmap;
+            mAct.doShowPicture();
+        }
+    };
+
     /**
      * 所需的所有权限信息
      */
@@ -93,6 +118,7 @@ public class DetectTrafficLabelStaticActivity extends AppCompatActivity implemen
     private Bitmap mBitmap;
 
     private int afCode = -1;
+    private final int rectLineSize = 3;
 
     private final Map<Integer, Bundle> mFaceLastEmotions = new HashMap<>();
 
@@ -105,8 +131,15 @@ public class DetectTrafficLabelStaticActivity extends AppCompatActivity implemen
 
     private ArrayList<Classifier.Recognition> mLastRecognitions = null;
 
+    private Thread mVideoThread = null;
+    private MediaDecoder mMediaDecoder = null;
+    private int mVideoMillSecondsLength = 0;
+    private int mVideoCurrent = 0;
+
     private Classifier mClassifier;
     public Classifier getClassifier(){ return mClassifier;}
+
+    private OnGetBitmapImpl mOnGetBitmapImpl = new OnGetBitmapImpl(this);
 
     // 私有函数列表 ***********************************************************
     private void initClassifier(float scoreThreshold, int numThreads){
@@ -159,6 +192,14 @@ public class DetectTrafficLabelStaticActivity extends AppCompatActivity implemen
         mTextViewDetectResult = findViewById(R.id.textDetectResult);
 
         mImageView = findViewById(R.id.static_traffic_pic);
+
+        findViewById(R.id.btnLoadVideo).setOnClickListener(new View.OnClickListener() {
+            @Override
+            public void onClick(View view) {
+                loadDetectVideo();
+            }
+        });
+
         findViewById(R.id.btnLoadImage_1).setOnClickListener(  new View.OnClickListener(){
             @Override
             public void onClick(View view) {
@@ -172,6 +213,19 @@ public class DetectTrafficLabelStaticActivity extends AppCompatActivity implemen
             }
         });
 
+        findViewById(R.id.btn_load_and_detect).setOnClickListener(new View.OnClickListener() {
+            @Override
+            public void onClick(View view) {
+                if(Build.VERSION.SDK_INT >= Build.VERSION_CODES.KITKAT){
+                    Intent intent = new Intent(Intent.ACTION_PICK);
+                    intent.setType("image/*");
+                    startActivityForResult(intent, 1);
+                }else{
+                    assert false;
+                }
+            }
+        });
+
         // 分类器
         initClassifier(scoreThreshold, 4);
 
@@ -181,6 +235,26 @@ public class DetectTrafficLabelStaticActivity extends AppCompatActivity implemen
 
     public void onActivityResult(int requestCode, int resultCode, Intent data){
         super.onActivityResult(requestCode, resultCode, data);
+
+        if(resultCode == Activity.RESULT_OK){
+            if(requestCode == 1) {
+                if(Build.VERSION.SDK_INT >= Build.VERSION_CODES.KITKAT){
+                    Cursor cursor = this.getContentResolver().query(data.getData(),
+                            null, null, null, null);
+
+                    cursor.moveToFirst();
+                    int idx = cursor.getColumnIndex(MediaStore.Images.ImageColumns.DATA);
+                    String fileSrc = cursor.getString(idx);
+                    cursor.close();
+
+                    mBitmap = BitmapFactory.decodeFile(fileSrc);
+                    doShowPicture();
+
+                }else{
+                    assert false;
+                }
+            }
+        }
     }
 
     /**
@@ -191,43 +265,71 @@ public class DetectTrafficLabelStaticActivity extends AppCompatActivity implemen
 
     }
 
+    @Override
+    public void onPreviewFrame(byte[] bytes, Camera camera) {
+        if(mDetectState != DETECT_STATE_FREE ){
+            return;
+        }
+
+        if(mVideoCurrent + 500 >= mVideoMillSecondsLength){
+            return;
+        }
+
+        mVideoCurrent += 500;
+        mMediaDecoder.decodeFrame(mVideoCurrent, mOnGetBitmapImpl);
+    }
+
+    private void loadDetectVideo(){
+        String fileName = "Rec0003.mp4";
+        Log.e("LWS", "load video..."+fileName);
+
+        String filePath = Environment.getExternalStoragePublicDirectory(Environment.DIRECTORY_MOVIES) + "/" + fileName;
+        mMediaDecoder = new MediaDecoder(filePath);
+
+        mVideoMillSecondsLength = Integer.parseInt(mMediaDecoder.getVedioFileLength());
+        mVideoCurrent = 0;
+    }
+
     private void showPicture(String imageName){
-        final int rectLineSize = 3;
 
         try {
             Log.e("LWS", "load image...");
             InputStream is = this.getAssets().open(imageName);
             mBitmap = BitmapFactory.decodeStream(is);
-            Bitmap tempBitmap = mBitmap.copy(Bitmap.Config.ARGB_8888, true);
-            Canvas canvas = new Canvas(tempBitmap);
-            Log.e("LWS", "load image...done");
-
-            // 进行预测
-            Log.e("LWS", "predict...");
-            ArrayList<Classifier.Recognition> recognitions = predict(0, mBitmap);
-            Log.e("LWS", "predict...done");
-
-            // 绘制识别结果
-            Log.e("LWS", "draw result...");
-            if(recognitions != null) {
-                for (Iterator iter = recognitions.iterator(); iter.hasNext(); ) {
-                    Classifier.Recognition box = (Classifier.Recognition) iter.next();
-                    Paint paint = new Paint();
-                    paint.setColor(Color.RED);
-                    paint.setTextSize(24);
-                    canvas.drawText(box.getTitle(), box.getRect().left, box.getRect().top - rectLineSize, paint);
-
-                    paint.setStyle(Paint.Style.STROKE);
-                    paint.setStrokeWidth(rectLineSize);
-                    canvas.drawRect(box.getRect().left, box.getRect().top, box.getRect().right, box.getRect().bottom, paint);
-                }
-            }
-            mImageView.setImageBitmap(tempBitmap);
-            Log.e("LWS", "draw result...done");
+            doShowPicture();
 
         }catch (IOException e){
             e.printStackTrace();;
         }
+    }
+
+    private void doShowPicture() {
+        Bitmap tempBitmap = mBitmap.copy(Bitmap.Config.ARGB_8888, true);
+        Canvas canvas = new Canvas(tempBitmap);
+        Log.e("LWS", "load image...done");
+
+        // 进行预测
+        Log.e("LWS", "predict...");
+        ArrayList<Classifier.Recognition> recognitions = predict(0, mBitmap);
+        Log.e("LWS", "predict...done");
+
+        // 绘制识别结果
+        Log.e("LWS", "draw result...");
+        if(recognitions != null) {
+            for (Iterator iter = recognitions.iterator(); iter.hasNext(); ) {
+                Classifier.Recognition box = (Classifier.Recognition) iter.next();
+                Paint paint = new Paint();
+                paint.setColor(Color.RED);
+                paint.setTextSize(24);
+                canvas.drawText(box.getTitle(), box.getRect().left, box.getRect().top - rectLineSize, paint);
+
+                paint.setStyle(Paint.Style.STROKE);
+                paint.setStrokeWidth(rectLineSize);
+                canvas.drawRect(box.getRect().left, box.getRect().top, box.getRect().right, box.getRect().bottom, paint);
+            }
+        }
+        mImageView.setImageBitmap(tempBitmap);
+        Log.e("LWS", "draw result...done");
     }
 
     // 进行预测
