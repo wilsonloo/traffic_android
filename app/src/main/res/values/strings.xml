@@ -85,4 +85,5 @@
 
     <string name="rbtn_back_camera">back camera</string>
     <string name="rbtn_front_camera">front camera</string>
+    <string name="real_traffic_shot">真实截图60</string>
 </resources>

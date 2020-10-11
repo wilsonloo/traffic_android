@@ -82,7 +82,7 @@ public class ClassifierYoloV3 extends Classifier {
     public String getModelPath() {
 //        return "yolov3_608_66_test_loss_2.5108.tflite";
 //        return "yolov3_416_66_test_loss_2.4417.tflite";
-        return "yolov3_416_66_lite_3.4591.tflite";
+        return "yolov3_416_66_2.4417.tflite";
     }
 
     @Override
@@ -103,7 +103,7 @@ public class ClassifierYoloV3 extends Classifier {
     }
 
     public List<Recognition> RecognizeImage(int faceId, final Bitmap bitmap, int sensorOrientation) {
-        Log.e("LWS", "start recoginze...");
+        Log.d("LWS", "start recoginze...");
 
         // 将原始图片载入成tensorflow 的图片张量
         mInputTensorImage.load(bitmap);
@@ -140,9 +140,9 @@ public class ClassifierYoloV3 extends Classifier {
 //        outputMap.put(4, outputScores);
 //        outputMap.put(5, numDetections);
         tflite.runForMultipleInputsOutputs(inputArray, outputMap);
-        Log.e("LWS", "start recoginze...done");
+        Log.d("LWS", "start recoginze...done");
 
-        Log.e("LWS", "post progress...");
+        Log.d("LWS", "post progress...");
         mBoxId = 0;
         final ArrayList<float[]> boxes = new ArrayList<>();
         boxes.clear();
@@ -155,7 +155,7 @@ public class ClassifierYoloV3 extends Classifier {
         concateBoxes(mPred_sbbox, SMALL_SCALE, originalWidth, originalHeight, boxes, classesInImage);
 
         final ArrayList<Recognition> recognitions = nms(boxes, classesInImage);
-        Log.e("LWS", "post progress...done");
+        Log.d("LWS", "post progress...done");
 
         return recognitions;
     }

@@ -2,31 +2,25 @@ package com.wilson_loo.traffic_label.activity;
 
 
 import android.Manifest;
-import android.annotation.TargetApi;
 import android.app.Activity;
 import android.content.Intent;
 import android.content.pm.ActivityInfo;
-import android.content.pm.PackageManager;
 import android.database.Cursor;
 import android.graphics.Bitmap;
 import android.graphics.BitmapFactory;
 import android.graphics.Canvas;
 import android.graphics.Color;
 import android.graphics.ImageFormat;
+import android.graphics.Matrix;
 import android.graphics.Paint;
 import android.graphics.Point;
 import android.graphics.Rect;
 import android.graphics.YuvImage;
 import android.hardware.Camera;
-import android.net.Uri;
 import android.os.Build;
 import android.os.Bundle;
 import android.os.Environment;
-import android.os.Trace;
-import android.provider.DocumentsContract;
 import android.provider.MediaStore;
-import android.support.v4.app.ActivityCompat;
-import android.support.v4.content.ContextCompat;
 import android.support.v7.app.AppCompatActivity;
 import android.util.DisplayMetrics;
 import android.util.Log;
@@ -36,13 +30,13 @@ import android.view.WindowManager;
 import android.widget.Button;
 import android.widget.ImageView;
 import android.widget.TextView;
-import android.widget.Toast;
 
 import com.arcsoft.trafficLabel.common.Constants;
 import com.tencent.bugly.crashreport.CrashReport;
 import com.wilson_loo.traffic_label.R;
 import com.wilson_loo.traffic_label.tflite.Classifier;
 import com.wilson_loo.traffic_label.tflite.ClassifierYoloV3;
+import com.wilson_loo.traffic_label.util.BitmapUtils;
 import com.wilson_loo.traffic_label.util.DrawHelper;
 import com.wilson_loo.traffic_label.util.MediaDecoder;
 import com.wilson_loo.traffic_label.util.OnGetBitmapListener;
@@ -51,9 +45,6 @@ import com.wilson_loo.traffic_label.util.camera.CameraListener;
 import com.wilson_loo.traffic_label.widget.FaceRectView;
 
 import java.io.ByteArrayOutputStream;
-import java.io.File;
-import java.io.FileInputStream;
-import java.io.FileNotFoundException;
 import java.io.IOException;
 import java.io.InputStream;
 import java.io.InvalidClassException;
@@ -63,9 +54,8 @@ import java.util.Iterator;
 import java.util.Map;
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
-import java.util.concurrent.Semaphore;
 
-public class DetectTrafficLabelStaticActivity extends AppCompatActivity implements ViewTreeObserver.OnGlobalLayoutListener, Camera.PreviewCallback {
+public class DetectTrafficLabelStaticActivity extends AppCompatActivity implements ViewTreeObserver.OnGlobalLayoutListener{
 
 
     private class OnGetBitmapImpl implements OnGetBitmapListener {
@@ -77,7 +67,7 @@ public class DetectTrafficLabelStaticActivity extends AppCompatActivity implemen
 
         @Override
         public void getBitmap(Bitmap bitmap, long timeMs) {
-            mAct.mBitmap = bitmap;
+            mAct.mBitmap = bitmap.copy(Bitmap.Config.ARGB_8888, true);;
             mAct.doShowPicture();
         }
     };
@@ -105,7 +95,7 @@ public class DetectTrafficLabelStaticActivity extends AppCompatActivity implemen
     /**
      * 相机预览显示的控件，可为SurfaceView或TextureView
      */
-    private View previewView;
+    private View mPreviewView;
     private FaceRectView mTrafficLabelRectView;
 
     private Camera.Size previewSize;
@@ -187,7 +177,7 @@ public class DetectTrafficLabelStaticActivity extends AppCompatActivity implemen
         // Activity启动后就锁定为启动时的方向
         setRequestedOrientation(ActivityInfo.SCREEN_ORIENTATION_LOCKED);
 
-        previewView = findViewById(R.id.fe_texture_preview);
+        mPreviewView = findViewById(R.id.fe_texture_preview);
         mTrafficLabelRectView = findViewById(R.id.fe_traffic_label_rect_view);
         mTextViewDetectResult = findViewById(R.id.textDetectResult);
 
@@ -212,6 +202,12 @@ public class DetectTrafficLabelStaticActivity extends AppCompatActivity implemen
                 showPicture("speed_limit_50_no_laba.jpg");
             }
         });
+        findViewById(R.id.btnLoadImage_3).setOnClickListener(  new View.OnClickListener(){
+            @Override
+            public void onClick(View view) {
+                showPicture("real_traffic_screen_shot.png");
+            }
+        });
 
         findViewById(R.id.btn_load_and_detect).setOnClickListener(new View.OnClickListener() {
             @Override
@@ -229,8 +225,8 @@ public class DetectTrafficLabelStaticActivity extends AppCompatActivity implemen
         // 分类器
         initClassifier(scoreThreshold, 4);
 
-        //在布局结束后才做初始化操作
-//        previewView.getViewTreeObserver().addOnGlobalLayoutListener(this);
+        //在布局结束后才做初始化操
+        mPreviewView.getViewTreeObserver().addOnGlobalLayoutListener(this);
     }
 
     public void onActivityResult(int requestCode, int resultCode, Intent data){
@@ -258,30 +254,83 @@ public class DetectTrafficLabelStaticActivity extends AppCompatActivity implemen
     }
 
     /**
-     * 在{@link #previewView}第一次布局完成后，去除该监听，并且进行引擎和相机的初始化
+     * 在{@link #mPreviewView}第一次布局完成后，去除该监听，并且进行引擎和相机的初始化
      */
     @Override
     public void onGlobalLayout() {
-
+        mPreviewView.getViewTreeObserver().removeOnGlobalLayoutListener(this);
+        initCamera();
     }
 
-    @Override
-    public void onPreviewFrame(byte[] bytes, Camera camera) {
-        if(mDetectState != DETECT_STATE_FREE ){
-            return;
-        }
+    private void initCamera() {
+        DisplayMetrics metrics = new DisplayMetrics(); getWindowManager().getDefaultDisplay().getMetrics(metrics);
 
-        if(mVideoCurrent + 500 >= mVideoMillSecondsLength){
-            return;
-        }
+        AppCompatActivity activity = this;
 
-        mVideoCurrent += 500;
-        mMediaDecoder.decodeFrame(mVideoCurrent, mOnGetBitmapImpl);
+        CameraListener cameraListener = new CameraListener() {
+            @Override
+            public void onCameraOpened(Camera camera, int cameraId, int displayOrientation, boolean isMirror) {
+                Log.i(TAG, "onCameraOpened: " + cameraId + "  " + displayOrientation + " " + isMirror);
+                previewSize = camera.getParameters().getPreviewSize();
+                drawHelper = new DrawHelper(previewSize.width,
+                        previewSize.height,
+                        mPreviewView.getWidth(),
+                        mPreviewView.getHeight(),
+                        displayOrientation,
+                        cameraId,
+                        isMirror,
+                        false,
+                        false);
+            }
+
+            @Override
+            public void onPreview(byte[] nv21, Camera camera) {
+                if(mDetectState != DETECT_STATE_FREE ){
+                    return;
+                }
+
+                if(mVideoCurrent + 500 >= mVideoMillSecondsLength){
+                    return;
+                }
+
+                mVideoCurrent += 500;
+                mMediaDecoder.decodeFrame(mVideoCurrent, mOnGetBitmapImpl);
+            }
+
+            @Override
+            public void onCameraClosed() {
+                Log.i(TAG, "onCameraClosed: ");
+            }
+
+            @Override
+            public void onCameraError(Exception e) {
+                Log.i(TAG, "onCameraError: " + e.getMessage());
+            }
+
+            @Override
+            public void onCameraConfigurationChanged(int cameraID, int displayOrientation) {
+                if (drawHelper != null) {
+                    drawHelper.setCameraDisplayOrientation(displayOrientation);
+                }
+                Log.i(TAG, "onCameraConfigurationChanged: " + cameraID + "  " + displayOrientation);
+            }
+        };
+
+        cameraHelper = new CameraHelper.Builder()
+                .previewViewSize(new Point(mPreviewView.getMeasuredWidth(), mPreviewView.getMeasuredHeight()))
+                .rotation(getWindowManager().getDefaultDisplay().getRotation())
+                .specificCameraId(rgbCameraId != null ? rgbCameraId : Camera.CameraInfo.CAMERA_FACING_FRONT)
+                .isMirror(false)
+                .previewOn(mPreviewView)
+                .cameraListener(cameraListener)
+                .build();
+        cameraHelper.init();
+        cameraHelper.start();
     }
 
     private void loadDetectVideo(){
         String fileName = "Rec0003.mp4";
-        Log.e("LWS", "load video..."+fileName);
+        Log.d("LWS", "load video..."+fileName);
 
         String filePath = Environment.getExternalStoragePublicDirectory(Environment.DIRECTORY_MOVIES) + "/" + fileName;
         mMediaDecoder = new MediaDecoder(filePath);
@@ -293,7 +342,7 @@ public class DetectTrafficLabelStaticActivity extends AppCompatActivity implemen
     private void showPicture(String imageName){
 
         try {
-            Log.e("LWS", "load image...");
+            Log.d("LWS", "load image...");
             InputStream is = this.getAssets().open(imageName);
             mBitmap = BitmapFactory.decodeStream(is);
             doShowPicture();
@@ -306,15 +355,15 @@ public class DetectTrafficLabelStaticActivity extends AppCompatActivity implemen
     private void doShowPicture() {
         Bitmap tempBitmap = mBitmap.copy(Bitmap.Config.ARGB_8888, true);
         Canvas canvas = new Canvas(tempBitmap);
-        Log.e("LWS", "load image...done");
+        Log.d("LWS", "load image...done");
 
         // 进行预测
-        Log.e("LWS", "predict...");
+        Log.d("LWS", "predict...");
         ArrayList<Classifier.Recognition> recognitions = predict(0, mBitmap);
-        Log.e("LWS", "predict...done");
+        Log.d("LWS", "predict...done");
 
         // 绘制识别结果
-        Log.e("LWS", "draw result...");
+        Log.d("LWS", "draw result...");
         if(recognitions != null) {
             for (Iterator iter = recognitions.iterator(); iter.hasNext(); ) {
                 Classifier.Recognition box = (Classifier.Recognition) iter.next();
@@ -329,7 +378,7 @@ public class DetectTrafficLabelStaticActivity extends AppCompatActivity implemen
             }
         }
         mImageView.setImageBitmap(tempBitmap);
-        Log.e("LWS", "draw result...done");
+        Log.d("LWS", "draw result...done");
     }
 
     // 进行预测
@@ -343,7 +392,7 @@ public class DetectTrafficLabelStaticActivity extends AppCompatActivity implemen
             for(int k = 0; k < recognitions.size(); ++k){
                 result += recognitions.get(k).getName()+" : " + recognitions.get(k).getConfidence() + "\n";
             }
-            Log.e("= Detect result(2)", ">>>>>>>>>>>>>>>>>>>> \n" + result);
+            Log.e("LWS", ">>>>>>>>>>>>>>>>>>>> \n" + result);
 
             return recognitions;
         }

@@ -5,6 +5,11 @@
     android:layout_weight="1"
     android:orientation="vertical">
 
+    <TextureView
+        android:id="@+id/fe_texture_preview"
+        android:layout_width="80dp"
+        android:layout_height="80dp" />
+
     <ImageView
         android:id="@+id/static_traffic_pic"
         android:layout_width="match_parent"
@@ -31,7 +36,12 @@
         android:layout_gravity="bottom"
         android:id="@+id/btnLoadImage_2"
         android:text="speed limit 50_no_laba"/>
-
+    <Button
+        android:layout_width="match_parent"
+        android:layout_height="48dp"
+        android:layout_gravity="bottom"
+        android:id="@+id/btnLoadImage_3"
+        android:text="@string/real_traffic_shot"/>
     <Button
         android:layout_width="match_parent"
         android:layout_height="48dp"

@@ -226,7 +226,7 @@ public class DetectTrafficLabelActivity extends BaseActivity implements ViewTree
                     for(int k = 0; k < recognitions.size(); ++k){
                         result += recognitions.get(k).getName()+" : " + recognitions.get(k).getConfidence() + "\n";
                     }
-                    Log.e("LWS", ">>>>>>>>>>>>>>>>>>>> " + result);
+                    Log.e("LWS", ">>>>>>>>>>>>>>>>>>>> \n" + result);
 
                     return new Object[]{recognitions};
                 }
