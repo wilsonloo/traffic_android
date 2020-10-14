@@ -28,7 +28,6 @@ import android.view.WindowManager;
 import android.widget.TextView;
 import android.widget.Toast;
 
-import com.arcsoft.trafficLabel.common.Constants;
 import com.wilson_loo.traffic_label.R;
 import com.wilson_loo.traffic_label.tflite.ClassifierYoloV3;
 import com.wilson_loo.traffic_label.util.BitmapUtils;
@@ -69,7 +68,7 @@ public class DetectTrafficLabelActivity extends BaseActivity implements ViewTree
 
     private static final String TAG = "DetectTrafficActivity";
     private Integer rgbCameraId = Camera.CameraInfo.CAMERA_FACING_BACK;
-    private Integer mTensorflowType = Constants.TENSORFLOW_TYPE_TFLITE;
+    private String mTensorflowType = null;
 
     public static final int DETECT_STATE_FREE = 0;
     public static final int DETECT_STATE_DETECTING = 1;
@@ -288,19 +287,19 @@ public class DetectTrafficLabelActivity extends BaseActivity implements ViewTree
 
     private void initClassifier(float scoreThreshold, int numThreads){
         try {
-            if(mTensorflowType == Constants.TENSORFLOW_TYPE_FLASK_REMOTE) {
+            if(mTensorflowType.equals("remote flask")) {
                 mClassifier = Classifier.Create(this,
                         Classifier.Model.PYTHON_REMOTE,
                         Classifier.Device.CPU,
-                        numThreads);
-            }else if(mTensorflowType == Constants.TENSORFLOW_TYPE_TFLITE){
+                        numThreads,
+                        null);
+            }else {
                 mClassifier = Classifier.Create(this,
                         Classifier.Model.YOLO_V3,
                         Classifier.Device.CPU,
-                        numThreads);
+                        numThreads,
+                        null);
                 ((ClassifierYoloV3)mClassifier).setScoreThreshold(scoreThreshold);
-            }else{
-                throw new InvalidClassException("tensorflow usage type, flaskremote or tflite");
             }
 
         } catch (Exception e) {
@@ -317,7 +316,7 @@ public class DetectTrafficLabelActivity extends BaseActivity implements ViewTree
         // 摄像头
         Intent intent = getIntent();
         rgbCameraId = intent.getIntExtra("whichCamera", Camera.CameraInfo.CAMERA_FACING_BACK);
-        mTensorflowType = intent.getIntExtra("tensorflowType", Constants.TENSORFLOW_TYPE_TFLITE);
+        mTensorflowType = intent.getStringExtra("tensorflowType");
         float scoreThreshold = intent.getFloatExtra("scoreThreshold", 0.3f);
 
         setContentView(R.layout.activity_detect_traffic_signal);

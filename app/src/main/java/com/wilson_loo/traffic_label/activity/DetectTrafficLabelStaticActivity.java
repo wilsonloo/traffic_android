@@ -27,13 +27,14 @@ import android.util.Log;
 import android.view.View;
 import android.view.ViewTreeObserver;
 import android.view.WindowManager;
+import android.widget.ArrayAdapter;
 import android.widget.Button;
 import android.widget.ImageView;
 import android.widget.TextView;
 
-import com.arcsoft.trafficLabel.common.Constants;
 import com.tencent.bugly.crashreport.CrashReport;
 import com.wilson_loo.traffic_label.R;
+import com.wilson_loo.traffic_label.remote.ClassifierRemote;
 import com.wilson_loo.traffic_label.tflite.Classifier;
 import com.wilson_loo.traffic_label.tflite.ClassifierYoloV3;
 import com.wilson_loo.traffic_label.util.BitmapUtils;
@@ -56,7 +57,6 @@ import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
 
 public class DetectTrafficLabelStaticActivity extends AppCompatActivity implements ViewTreeObserver.OnGlobalLayoutListener{
-
 
     private class OnGetBitmapImpl implements OnGetBitmapListener {
         private final DetectTrafficLabelStaticActivity mAct;
@@ -83,7 +83,7 @@ public class DetectTrafficLabelStaticActivity extends AppCompatActivity implemen
 
     private static final String TAG = "DetectTrafficStatic";
     private Integer rgbCameraId = Camera.CameraInfo.CAMERA_FACING_BACK;
-    private Integer mTensorflowType = Constants.TENSORFLOW_TYPE_TFLITE;
+    private String mTensorflowType = null;
 
     public static final int DETECT_STATE_FREE = 0;
     public static final int DETECT_STATE_DETECTING = 1;
@@ -91,6 +91,9 @@ public class DetectTrafficLabelStaticActivity extends AppCompatActivity implemen
 
     private static int WRITE_SD_CODE = 1;
     private static int READ_SD_CODE = 2;
+
+    private static final int PICK_IMAGE = 1;
+    private static final int PICK_VIDEO = 2;
 
     /**
      * 相机预览显示的控件，可为SurfaceView或TextureView
@@ -109,6 +112,7 @@ public class DetectTrafficLabelStaticActivity extends AppCompatActivity implemen
 
     private int afCode = -1;
     private final int rectLineSize = 3;
+    private final int videoCaptureInterval = 100;
 
     private final Map<Integer, Bundle> mFaceLastEmotions = new HashMap<>();
 
@@ -134,19 +138,20 @@ public class DetectTrafficLabelStaticActivity extends AppCompatActivity implemen
     // 私有函数列表 ***********************************************************
     private void initClassifier(float scoreThreshold, int numThreads){
         try {
-            if(mTensorflowType == Constants.TENSORFLOW_TYPE_FLASK_REMOTE) {
+            if(mTensorflowType.equals("remote flask")) {
                 mClassifier = Classifier.Create(this,
                         Classifier.Model.PYTHON_REMOTE,
                         Classifier.Device.CPU,
-                        numThreads);
-            }else if(mTensorflowType == Constants.TENSORFLOW_TYPE_TFLITE){
+                        numThreads,
+                        null);
+
+            }else{
                 mClassifier = Classifier.Create(this,
                         Classifier.Model.YOLO_V3,
                         Classifier.Device.CPU,
-                        numThreads);
+                        numThreads,
+                        mTensorflowType);
                 ((ClassifierYoloV3)mClassifier).setScoreThreshold(scoreThreshold);
-            }else{
-                throw new InvalidClassException("tensorflow usage type, flaskremote or tflite");
             }
 
         } catch (Exception e) {
@@ -163,7 +168,7 @@ public class DetectTrafficLabelStaticActivity extends AppCompatActivity implemen
         // 摄像头
         Intent intent = getIntent();
         rgbCameraId = intent.getIntExtra("whichCamera", Camera.CameraInfo.CAMERA_FACING_BACK);
-        mTensorflowType = intent.getIntExtra("tensorflowType", Constants.TENSORFLOW_TYPE_TFLITE);
+        mTensorflowType = intent.getStringExtra("tensorflowType");
         float scoreThreshold = intent.getFloatExtra("scoreThreshold", 0.3f);
 
         setContentView(R.layout.activity_detect_traffic_static_signal);
@@ -186,7 +191,14 @@ public class DetectTrafficLabelStaticActivity extends AppCompatActivity implemen
         findViewById(R.id.btnLoadVideo).setOnClickListener(new View.OnClickListener() {
             @Override
             public void onClick(View view) {
-                loadDetectVideo();
+//                loadDetectVideo();
+                if(Build.VERSION.SDK_INT >= Build.VERSION_CODES.KITKAT){
+                    Intent intent = new Intent(Intent.ACTION_PICK);
+                    intent.setType("video/*");
+                    startActivityForResult(intent, PICK_VIDEO);
+                }else{
+                    assert false;
+                }
             }
         });
 
@@ -215,7 +227,7 @@ public class DetectTrafficLabelStaticActivity extends AppCompatActivity implemen
                 if(Build.VERSION.SDK_INT >= Build.VERSION_CODES.KITKAT){
                     Intent intent = new Intent(Intent.ACTION_PICK);
                     intent.setType("image/*");
-                    startActivityForResult(intent, 1);
+                    startActivityForResult(intent, PICK_IMAGE);
                 }else{
                     assert false;
                 }
@@ -233,8 +245,8 @@ public class DetectTrafficLabelStaticActivity extends AppCompatActivity implemen
         super.onActivityResult(requestCode, resultCode, data);
 
         if(resultCode == Activity.RESULT_OK){
-            if(requestCode == 1) {
-                if(Build.VERSION.SDK_INT >= Build.VERSION_CODES.KITKAT){
+            if(requestCode == PICK_IMAGE) {
+                if(Build.VERSION.SDK_INT >= Build.VERSION_CODES.KITKAT) {
                     Cursor cursor = this.getContentResolver().query(data.getData(),
                             null, null, null, null);
 
@@ -245,7 +257,20 @@ public class DetectTrafficLabelStaticActivity extends AppCompatActivity implemen
 
                     mBitmap = BitmapFactory.decodeFile(fileSrc);
                     doShowPicture();
+                }else{
+                    assert false;
+                }
+            }else if(requestCode == PICK_VIDEO){
+                if(Build.VERSION.SDK_INT >= Build.VERSION_CODES.KITKAT) {
+                    Cursor cursor = this.getContentResolver().query(data.getData(),
+                            null, null, null, null);
 
+                    cursor.moveToFirst();
+                    int idx = cursor.getColumnIndex(MediaStore.Images.ImageColumns.DATA);
+                    String fileSrc = cursor.getString(idx);
+                    cursor.close();
+
+                    loadDetectVideo(fileSrc);
                 }else{
                     assert false;
                 }
@@ -285,16 +310,13 @@ public class DetectTrafficLabelStaticActivity extends AppCompatActivity implemen
 
             @Override
             public void onPreview(byte[] nv21, Camera camera) {
-                if(mDetectState != DETECT_STATE_FREE ){
-                    return;
-                }
+                if (mDetectState == DETECT_STATE_FREE) {
+                    if (mVideoCurrent + videoCaptureInterval < mVideoMillSecondsLength) {
 
-                if(mVideoCurrent + 500 >= mVideoMillSecondsLength){
-                    return;
+                        mVideoCurrent += videoCaptureInterval;
+                        mMediaDecoder.decodeFrame(mVideoCurrent, mOnGetBitmapImpl);
+                    }
                 }
-
-                mVideoCurrent += 500;
-                mMediaDecoder.decodeFrame(mVideoCurrent, mOnGetBitmapImpl);
             }
 
             @Override
@@ -328,11 +350,10 @@ public class DetectTrafficLabelStaticActivity extends AppCompatActivity implemen
         cameraHelper.start();
     }
 
-    private void loadDetectVideo(){
-        String fileName = "Rec0003.mp4";
-        Log.d("LWS", "load video..."+fileName);
+    private void loadDetectVideo(String filePath){
+        Log.d("LWS", "load video..."+filePath);
 
-        String filePath = Environment.getExternalStoragePublicDirectory(Environment.DIRECTORY_MOVIES) + "/" + fileName;
+//        String filePath = Environment.getExternalStoragePublicDirectory(Environment.DIRECTORY_MOVIES) + "/" + fileName;
         mMediaDecoder = new MediaDecoder(filePath);
 
         mVideoMillSecondsLength = Integer.parseInt(mMediaDecoder.getVedioFileLength());
@@ -362,6 +383,10 @@ public class DetectTrafficLabelStaticActivity extends AppCompatActivity implemen
         ArrayList<Classifier.Recognition> recognitions = predict(0, mBitmap);
         Log.d("LWS", "predict...done");
 
+        doDrawRecognitions(tempBitmap, canvas, recognitions);
+    }
+
+    private void doDrawRecognitions(Bitmap tempBitmap, Canvas canvas, ArrayList<Classifier.Recognition> recognitions) {
         // 绘制识别结果
         Log.d("LWS", "draw result...");
         if(recognitions != null) {
@@ -398,5 +423,9 @@ public class DetectTrafficLabelStaticActivity extends AppCompatActivity implemen
         }
 
         return null;
+    }
+
+    private void addRecognitions(ArrayList<Classifier.Recognition> recognitions){
+
     }
 }

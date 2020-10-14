@@ -3,6 +3,7 @@ package com.wilson_loo.traffic_label.remote;
 import android.app.Activity;
 import android.content.res.AssetManager;
 import android.graphics.Bitmap;
+import android.graphics.RectF;
 
 import com.wilson_loo.traffic_label.util.BitmapUtils;
 import com.wilson_loo.traffic_label.tflite.Classifier;
@@ -40,10 +41,10 @@ public class ClassifierRemote extends Classifier {
     private final ArrayList<Recognition> recognitionArrayList = new ArrayList<>();
     private static Lock mLocker = new ReentrantLock();
 
-    public ClassifierRemote(Activity activity, Device device, int numThreads)
+    public ClassifierRemote(Activity activity, Device device, int numThreads, String modelPath)
             throws IOException
     {
-        super(activity, device, numThreads);
+        super(activity, device, numThreads, modelPath);
 
         mActivity = activity;
     }
@@ -66,8 +67,7 @@ public class ClassifierRemote extends Classifier {
         }
         mLocker.unlock();
 
-        Bitmap adjBitmap = BitmapUtils.adjustToSize(bitmap, this.imageSizeX, this.imageSizeY);
-        mRpcThread = doAsyncRpc(adjBitmap);
+        mRpcThread = doAsyncRpc(bitmap);
 
         return null;
     }
@@ -94,7 +94,7 @@ public class ClassifierRemote extends Classifier {
                     bitmap.compress(Bitmap.CompressFormat.JPEG, 100, baos);
                     byte[] imageBinary = baos.toByteArray();
 
-                    String path = "http://192.168.1.19:5000/classify_emotion?binary=1";
+                    String path = "http://192.168.1.19:5000/classify_traffic?binary=1";
                     URL url = new URL(path);
                     HttpURLConnection conn = (HttpURLConnection) url.openConnection();
                     conn.setConnectTimeout(5000);
@@ -122,17 +122,29 @@ public class ClassifierRemote extends Classifier {
                             bos.write(buffer, 0, len);
                         }
                         String result = new String(bos.toByteArray());
-                        String elems[] = result.split(":");
-                        String emotionType = elems[0];
-                        Float confidence = Float.valueOf(elems[1]);
-                        System.out.printf("=====================> get classify result %s:%.4f\n", emotionType, confidence);
+                        if(result != null && !result.isEmpty()) {
+                            String boxes[] = result.split("\\|");
 
-                        mLocker.lock();
-                        recognitionArrayList.add(new Recognition(emotionType, emotionType, confidence, null));
-                        mLocker.unlock();
+                            mLocker.lock();
+                            for (int k = 0; k < boxes.length; ++k) {
+                                String elems[] = boxes[k].split(":");
+                                float left = Float.valueOf(elems[0]);
+                                float top = Float.valueOf(elems[1]);
+                                float right = Float.valueOf(elems[2]);
+                                float bottom = Float.valueOf(elems[3]);
+                                float prob = Float.valueOf(elems[4]);
+                                float label = Float.valueOf(elems[5]);
+                                RectF rect = new RectF(left, top, right, bottom);
+                                String title = mLabelsList.get((int) label);
+                                Recognition recognition = new Recognition(title, title, prob, rect);
+                                recognitionArrayList.add(recognition);
+                            }
+                            mLocker.unlock();
+                        }
 
 //                        baos.close();
                         response.close();
+                        conn.disconnect();
                     } else {
                         System.out.printf("call with error mesage, code:%d\n", code);
                     }
@@ -148,7 +160,7 @@ public class ClassifierRemote extends Classifier {
 
     @Override
     public String getModelPath() {
-        return "emotion.model.mobilenetV2_x75_1.00_20200913.tflite";
+        return null;
     }
     @Override
     public String getLabelPath() {

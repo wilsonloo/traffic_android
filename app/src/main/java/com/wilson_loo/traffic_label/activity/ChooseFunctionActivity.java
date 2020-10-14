@@ -13,7 +13,6 @@ import android.widget.RadioGroup;
 import android.widget.SeekBar;
 import android.widget.Spinner;
 
-import com.arcsoft.trafficLabel.common.Constants;
 import com.tencent.bugly.crashreport.CrashReport;
 import com.wilson_loo.traffic_label.R;
 
@@ -54,8 +53,9 @@ public class ChooseFunctionActivity extends BaseActivity {
 
     // 摄像头索引
     private int mCameraIndex = Camera.CameraInfo.CAMERA_FACING_BACK;
-    private int mTensorflowType = Constants.TENSORFLOW_TYPE_TFLITE;
     private SeekBar mSeekBar = null;
+
+    private Spinner mSpinnerTflite = null;
 
     private RadioGroup.OnCheckedChangeListener mRadioGroupChooseCameraListener = new RadioGroup.OnCheckedChangeListener(){
         @Override
@@ -73,19 +73,6 @@ public class ChooseFunctionActivity extends BaseActivity {
                     assert false;
                     break;
             }
-        }
-    };
-
-    private Spinner.OnItemSelectedListener mSpinnerTFliteListener = new Spinner.OnItemSelectedListener(){
-
-        @Override
-        public void onItemSelected(AdapterView<?> adapterView, View view, int tensorflowType, long l) {
-            mTensorflowType = tensorflowType;
-        }
-
-        @Override
-        public void onNothingSelected(AdapterView<?> adapterView) {
-
         }
     };
 
@@ -108,8 +95,7 @@ public class ChooseFunctionActivity extends BaseActivity {
         radioGroupChooseCamera.setOnCheckedChangeListener(mRadioGroupChooseCameraListener);
 
         // tflite type
-        Spinner spinnerTflite = findViewById(R.id.spinner_tensorflows);
-        spinnerTflite.setOnItemSelectedListener(mSpinnerTFliteListener);
+        mSpinnerTflite = findViewById(R.id.spinner_tensorflows);
 
         // 积分阈值
         mSeekBar= findViewById(R.id.scoreThresoldSeekBar);
@@ -172,7 +158,7 @@ public class ChooseFunctionActivity extends BaseActivity {
     public void jumpToDetectFaceEmotionActivity(View view) {
         Bundle bundle = new Bundle();
         bundle.putInt("whichCamera", mCameraIndex);
-        bundle.putInt("tensorflowType", mTensorflowType);
+        bundle.putString("tensorflowType", mSpinnerTflite.getSelectedItem().toString());
         bundle.putFloat("scoreThreshold", mSeekBar.getProgress() * 1.0f / 100);
         checkLibraryAndJump(DetectTrafficLabelActivity.class, bundle);
     }
@@ -180,7 +166,7 @@ public class ChooseFunctionActivity extends BaseActivity {
     public void jumpToDetectStaticImageActivity(View view){
         Bundle bundle = new Bundle();
         bundle.putInt("whichCamera", mCameraIndex);
-        bundle.putInt("tensorflowType", mTensorflowType);
+        bundle.putString("tensorflowType", mSpinnerTflite.getSelectedItem().toString());
         bundle.putFloat("scoreThreshold", mSeekBar.getProgress() * 1.0f / 100);
         checkLibraryAndJump(DetectTrafficLabelStaticActivity.class, bundle);
     }

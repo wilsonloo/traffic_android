@@ -66,12 +66,12 @@ public abstract class Classifier {
     /**
      * Image size along the x axis.
      */
-    protected final int imageSizeX;
+    protected int imageSizeX = 0;
 
     /**
      * Image size along the y axis.
      */
-    protected final int imageSizeY;
+    protected int imageSizeY = 0;
 
     /**
      * An instance of the driver class to run model inference with Tensorflow Lite.
@@ -96,12 +96,12 @@ public abstract class Classifier {
     /**
      * Output probability TensorBuffer.
      */
-    protected final TensorBuffer mOutputProbabilityBuffer;
+    protected TensorBuffer mOutputProbabilityBuffer;
 
     /**
      * Processer to apply post processing of the output probability.
      */
-    protected final TensorProcessor mProbabilityProcessor;
+    protected TensorProcessor mProbabilityProcessor;
 
 
     // 识别结果
@@ -140,10 +140,17 @@ public abstract class Classifier {
     }
 
     // 内部构造函数，应该由工厂接口create创建实例
-    protected Classifier(Activity activity, Device device, int numThreads) throws IOException {
+    protected Classifier(Activity activity, Device device, int numThreads, String modelPath) throws IOException {
+        // 标签文件
+        String labelPath = getLabelPath();
+        mLabelsList = FileUtil.loadLabels(activity, labelPath);
 
         // 加载tflite 模型
-        String modelPath = getModelPath();
+        modelPath = modelPath == null ? getModelPath() : modelPath;
+        if(modelPath == null){
+            return;
+        }
+
         tfliteModel = FileUtil.loadMappedFile(activity, modelPath);
 
         switch (device) {
@@ -163,9 +170,6 @@ public abstract class Classifier {
         tfliteOptions.setNumThreads(numThreads);
         tflite = new Interpreter(tfliteModel, tfliteOptions);
 
-        // 标签文件
-        String labelPath = getLabelPath();
-        mLabelsList = FileUtil.loadLabels(activity, labelPath);
 
         // 输入的图片尺寸信息
         {
@@ -301,14 +305,14 @@ public abstract class Classifier {
      * @param numThreads The number of threads to use for classification.
      * @return A classifier with the desired configuration.
      */
-    public static Classifier Create(Activity activity, Model model, Device device, int numThreads)
+    public static Classifier Create(Activity activity, Model model, Device device, int numThreads, String modelPath)
             throws IOException {
         if (model == Model.FLOAT_MOBILENET) {
             return new ClassifierFloatMobileNet(activity, device, numThreads);
         }else if(model == Model.PYTHON_REMOTE) {
-            return new ClassifierRemote(activity, device, numThreads);
+            return new ClassifierRemote(activity, device, numThreads, null);
         }else if(model == Model.YOLO_V3){
-            return new ClassifierYoloV3(activity, device, numThreads);
+            return new ClassifierYoloV3(activity, device, numThreads, modelPath);
         } else {
             throw new UnsupportedOperationException("model:" + model);
         }

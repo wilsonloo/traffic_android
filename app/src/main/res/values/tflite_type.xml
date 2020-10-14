@@ -1,7 +1,8 @@
 <?xml version="1.0" encoding="utf-8"?>
 <resources>
     <string-array name="tflite_list">
-        <item>本地 tflite</item>
-        <item>远程服务flask</item>
+        <item>yolov3_608_66_2.4417.tflite</item>
+        <item>yolov3_416_66_2.4417.tflite</item>>
+        <item>remote flask</item>
     </string-array>
 </resources>

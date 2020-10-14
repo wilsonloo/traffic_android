@@ -70,8 +70,8 @@ public class ClassifierYoloV3 extends Classifier {
     private float[] numDetections;
 
 
-    protected ClassifierYoloV3(Activity activity, Device device, int numThreads) throws IOException {
-        super(activity, device, numThreads);
+    protected ClassifierYoloV3(Activity activity, Device device, int numThreads, String modelPath) throws IOException {
+        super(activity, device, numThreads, modelPath);
 
         LARGE_SCALE = imageSizeX / 8;
         MIDDLE_SCALE = imageSizeX / 16;
@@ -82,7 +82,7 @@ public class ClassifierYoloV3 extends Classifier {
     public String getModelPath() {
 //        return "yolov3_608_66_test_loss_2.5108.tflite";
 //        return "yolov3_416_66_test_loss_2.4417.tflite";
-        return "yolov3_416_66_2.4417.tflite";
+        return "yolov3_608_66_2.4417.tflite";
     }
 
     @Override
@@ -113,7 +113,7 @@ public class ClassifierYoloV3 extends Classifier {
         // TODO(b/143564309): Fuse ops inside ImageProcessor.
         ImageProcessor imageProcessor = new ImageProcessor.Builder()
                 .add(new ResizeWithCropOrPadOp(imageSizeX, imageSizeX))
-                .add(new ResizeOp(imageSizeX, imageSizeY, ResizeOp.ResizeMethod.BILINEAR))
+//                .add(new ResizeOp(imageSizeX, imageSizeY, ResizeOp.ResizeMethod.BILINEAR))
                 .add(new Rot90Op(numRotation))
                 .add(getPreprocessNormalizeOp())
                 .build();
